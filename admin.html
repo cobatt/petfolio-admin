@@ -1,0 +1,2718 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Petfolio Admin</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, 'Pretendard', sans-serif; background: #F5F5F2; color: #1A1F1C; min-height: 100vh; display: flex; }
+
+/* ── 사이드바 ── */
+.sidebar {
+  width: 220px; min-height: 100vh; background: #1A1F1C;
+  display: flex; flex-direction: column; flex-shrink: 0;
+  position: sticky; top: 0; height: 100vh;
+}
+.sidebar-logo {
+  padding: 24px 20px 20px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.sidebar-logo .logo-mark { font-size: 22px; }
+.sidebar-logo .logo-text { font-size: 15px; font-weight: 700; color: white; margin-top: 4px; }
+.sidebar-logo .logo-sub { font-size: 10px; color: rgba(255,255,255,0.4); font-weight: 500; letter-spacing: 1px; text-transform: uppercase; margin-top: 2px; }
+.sidebar-nav { padding: 16px 12px; flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border-radius: 10px;
+  cursor: pointer; color: rgba(255,255,255,0.5);
+  font-size: 13px; font-weight: 500;
+  transition: all 0.15s; border: none; background: none; width: 100%; text-align: left;
+}
+.nav-item:hover { background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.85); }
+.nav-item.active { background: #4A7C59; color: white; }
+.nav-icon { font-size: 16px; width: 20px; text-align: center; }
+.nav-badge {
+  margin-left: auto; background: rgba(255,255,255,0.15);
+  color: rgba(255,255,255,0.7); font-size: 10px; font-weight: 700;
+  padding: 2px 7px; border-radius: 99px;
+}
+.nav-item.active .nav-badge { background: rgba(255,255,255,0.25); color: white; }
+.sidebar-footer { padding: 16px 20px; border-top: 1px solid rgba(255,255,255,0.08); }
+.api-status { display: flex; align-items: center; gap: 8px; }
+.api-dot { width: 7px; height: 7px; border-radius: 50%; background: #4A7C59; }
+.api-dot.offline { background: #D94F3D; }
+.api-label { font-size: 11px; color: rgba(255,255,255,0.4); }
+
+/* ── 메인 ── */
+.main { flex: 1; min-width: 0; }
+.page { display: none; padding: 32px; max-width: 1200px; }
+.page.active { display: block; }
+
+/* ── 페이지 헤더 ── */
+.page-header { margin-bottom: 24px; }
+.page-title { font-size: 22px; font-weight: 700; color: #1A1F1C; }
+.page-sub { font-size: 13px; color: #6B7570; margin-top: 4px; }
+
+/* ── 통계 그리드 ── */
+.stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px; }
+.stat-card {
+  background: white; border-radius: 14px; padding: 18px 20px;
+  border: 1px solid #EBF2EE;
+}
+.stat-label { font-size: 11px; font-weight: 700; color: #6B7570; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+.stat-value { font-size: 28px; font-weight: 700; color: #1A1F1C; }
+.stat-value.green { color: #4A7C59; }
+.stat-value.red { color: #D94F3D; }
+.stat-value.amber { color: #E8A030; }
+.stat-sub { font-size: 11px; color: #C2C9C5; margin-top: 4px; }
+
+/* ── 커버리지 바 ── */
+.coverage-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 24px; }
+.coverage-card { background: white; border-radius: 14px; padding: 18px 20px; border: 1px solid #EBF2EE; }
+.coverage-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.coverage-title { font-size: 12px; font-weight: 700; color: #1A1F1C; }
+.coverage-pct { font-size: 18px; font-weight: 700; color: #4A7C59; }
+.cov-bar-track { height: 8px; background: #EBF2EE; border-radius: 99px; overflow: hidden; }
+.cov-bar-fill { height: 8px; border-radius: 99px; background: #4A7C59; transition: width 0.8s ease; }
+.cov-bar-fill.amber { background: #E8A030; }
+.cov-bar-fill.red { background: #D94F3D; }
+.cov-counts { display: flex; justify-content: space-between; margin-top: 6px; }
+.cov-count { font-size: 10px; color: #C2C9C5; }
+
+/* ── 카드 ── */
+.card { background: white; border-radius: 14px; border: 1px solid #EBF2EE; margin-bottom: 16px; overflow: hidden; }
+.card-header { padding: 16px 20px; border-bottom: 1px solid #EBF2EE; display: flex; align-items: center; justify-content: space-between; }
+.card-title { font-size: 14px; font-weight: 700; color: #1A1F1C; }
+.card-count { font-size: 12px; color: #6B7570; background: #EBF2EE; padding: 3px 10px; border-radius: 99px; font-weight: 600; }
+.card-body { padding: 0; }
+
+/* ── 툴바 ── */
+.toolbar { padding: 12px 16px; border-bottom: 1px solid #F5F5F3; display: flex; gap: 8px; background: #FAFAF7; }
+.search-input {
+  flex: 1; padding: 8px 14px; border: 1px solid #EBF2EE; border-radius: 8px;
+  font-size: 13px; font-family: inherit; outline: none; background: white;
+}
+.search-input:focus { border-color: #4A7C59; }
+.filter-select {
+  padding: 8px 12px; border: 1px solid #EBF2EE; border-radius: 8px;
+  font-size: 12px; font-family: inherit; background: white; outline: none; cursor: pointer;
+}
+.btn {
+  padding: 8px 16px; border-radius: 8px; font-size: 12px; font-weight: 700;
+  border: none; cursor: pointer; transition: opacity 0.15s;
+}
+.btn:hover { opacity: 0.85; }
+.btn-green { background: #4A7C59; color: white; }
+.btn-outline { background: white; color: #4A7C59; border: 1px solid #4A7C59; }
+.btn-red { background: #FDECEA; color: #D94F3D; }
+.btn-sm { padding: 5px 10px; font-size: 11px; border-radius: 6px; border: none; cursor: pointer; font-weight: 700; }
+
+/* ── 테이블 ── */
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { padding: 10px 16px; font-size: 10px; font-weight: 700; color: #6B7570; text-align: left; text-transform: uppercase; letter-spacing: 0.5px; background: #FAFAF7; border-bottom: 1px solid #EBF2EE; }
+td { padding: 13px 16px; border-bottom: 1px solid #F5F5F3; vertical-align: middle; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: #FAFAF7; }
+
+/* ── 뱃지 ── */
+.badge { display: inline-flex; align-items: center; gap: 3px; padding: 3px 9px; border-radius: 99px; font-size: 10px; font-weight: 700; }
+.badge-green { background: #EBF2EE; color: #4A7C59; }
+.badge-amber { background: #FEF3E2; color: #E8A030; }
+.badge-red { background: #FDECEA; color: #D94F3D; }
+.badge-gray { background: #F5F5F3; color: #6B7570; }
+.badge-blue { background: #EEF3FB; color: #3B6FD4; }
+
+/* ── 상품 셀 ── */
+.food-cell { display: flex; align-items: center; gap: 10px; }
+.food-thumb { width: 36px; height: 36px; background: #EBF2EE; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; overflow: hidden; }
+.food-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.food-brand { font-size: 10px; font-weight: 700; color: #6B7570; text-transform: uppercase; }
+.food-name { font-size: 13px; font-weight: 600; color: #1A1F1C; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── 페이지네이션 ── */
+.pagination-bar { display:flex; align-items:center; justify-content:space-between; padding:10px 16px; border-top:1px solid #F5F5F3; background:#FAFAF7; }
+.pagination-info { font-size:12px; color:#6B7570; }
+.pagination-pages { display:flex; align-items:center; gap:3px; }
+.page-btn { min-width:30px; height:30px; padding:0 6px; border-radius:7px; border:1px solid #EBF2EE; background:white; font-size:12px; font-weight:600; color:#6B7570; cursor:pointer; transition:all 0.1s; }
+.page-btn:hover:not(:disabled) { border-color:#4A7C59; color:#4A7C59; }
+.page-btn.active { background:#4A7C59; color:white; border-color:#4A7C59; }
+.page-btn:disabled { opacity:0.35; cursor:default; }
+.page-ellipsis { font-size:12px; color:#C2C9C5; padding:0 3px; }
+
+/* ── 바코드 인풋 인라인 ── */
+.barcode-input-wrap { display: flex; gap: 6px; align-items: center; }
+.barcode-inline-input {
+  padding: 5px 10px; border: 1px solid #EBF2EE; border-radius: 6px;
+  font-size: 12px; font-family: 'Courier New', monospace; width: 160px; outline: none;
+}
+.barcode-inline-input:focus { border-color: #4A7C59; }
+
+/* ── 바코드 텍스트 ── */
+.barcode-mono { font-family: 'Courier New', monospace; font-size: 12px; color: #6B7570; background: #F5F5F3; padding: 3px 8px; border-radius: 5px; }
+
+/* ── 빈 상태 ── */
+.empty-state { padding: 56px 24px; text-align: center; }
+.empty-icon { font-size: 36px; margin-bottom: 12px; }
+.empty-title { font-size: 14px; font-weight: 700; color: #1A1F1C; }
+.empty-sub { font-size: 12px; color: #C2C9C5; margin-top: 4px; }
+
+/* ── 로딩 ── */
+.loading-row td { text-align: center; padding: 40px; color: #C2C9C5; font-size: 13px; }
+
+/* ── 진행바 섹션 ── */
+.section-title { font-size: 13px; font-weight: 700; color: #1A1F1C; margin-bottom: 14px; }
+
+/* ── 최근 매칭 카드 ── */
+.match-list { display: flex; flex-direction: column; gap: 0; }
+.match-item { display: flex; align-items: center; gap: 12px; padding: 12px 20px; border-bottom: 1px solid #F5F5F3; }
+.match-item:last-child { border-bottom: none; }
+.match-icon { width: 32px; height: 32px; background: #EBF2EE; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+.match-info { flex: 1; min-width: 0; }
+.match-name { font-size: 12px; font-weight: 600; color: #1A1F1C; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.match-barcode { font-size: 11px; color: #6B7570; font-family: 'Courier New', monospace; margin-top: 1px; }
+.match-source { font-size: 10px; }
+
+/* ── 토스트 ── */
+.toast {
+  position: fixed; bottom: 24px; right: 24px;
+  background: #1A1F1C; color: white;
+  padding: 12px 18px; border-radius: 12px;
+  font-size: 13px; font-weight: 600;
+  opacity: 0; transition: opacity 0.25s; z-index: 999; pointer-events: none;
+}
+.toast.show { opacity: 1; }
+
+/* ── 모달 ── */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+  display: none; align-items: center; justify-content: center; z-index: 100;
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  background: white; border-radius: 18px; padding: 24px;
+  width: 460px; max-height: 85vh; overflow-y: auto;
+}
+.modal-title { font-size: 16px; font-weight: 700; margin-bottom: 16px; }
+.modal-label { font-size: 11px; font-weight: 700; color: #6B7570; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; margin-top: 14px; }
+.modal-input {
+  width: 100%; padding: 10px 14px; border: 1px solid #EBF2EE; border-radius: 10px;
+  font-size: 13px; font-family: inherit; outline: none;
+}
+.modal-input:focus { border-color: #4A7C59; }
+.modal-footer { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
+.modal-results { max-height: 280px; overflow-y: auto; margin-top: 12px; }
+.modal-food-item {
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+  border: 1.5px solid transparent; border-radius: 10px; cursor: pointer;
+  transition: all 0.12s; margin-bottom: 6px;
+}
+.modal-food-item:hover { border-color: #4A7C59; background: #EBF2EE; }
+.modal-food-item.selected { border-color: #4A7C59; background: #EBF2EE; }
+
+/* ── 스캔 로그 타임라인 ── */
+.log-item { display: flex; gap: 14px; padding: 12px 20px; border-bottom: 1px solid #F5F5F3; }
+.log-item:last-child { border-bottom: none; }
+.log-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+.log-content { flex: 1; }
+.log-action { font-size: 13px; font-weight: 600; color: #1A1F1C; }
+.log-detail { font-size: 11px; color: #6B7570; margin-top: 2px; font-family: 'Courier New', monospace; }
+.log-time { font-size: 11px; color: #C2C9C5; }
+</style>
+</head>
+<body>
+
+<!-- ── 사이드바 ── -->
+<div class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark">🐾</div>
+    <div class="logo-text">Petfolio</div>
+    <div class="logo-sub">Admin Console</div>
+  </div>
+  <nav class="sidebar-nav">
+    <button class="nav-item active" onclick="showPage('dashboard')">
+      <span class="nav-icon">📊</span> 대시보드
+    </button>
+    <button class="nav-item" onclick="showPage('foods')">
+      <span class="nav-icon">🥫</span> 상품 관리
+      <span class="nav-badge" id="nav-foods-count">—</span>
+    </button>
+    <button class="nav-item" onclick="showPage('barcode')">
+      <span class="nav-icon">📷</span> 바코드
+      <span class="nav-badge" id="nav-barcode-count">—</span>
+    </button>
+    <button class="nav-item" onclick="showPage('brands')">
+      <span class="nav-icon">🏷</span> 브랜드 관리
+    </button>
+    <button class="nav-item" onclick="showPage('users')">
+      <span class="nav-icon">👤</span> 유저 관리
+      <span class="nav-badge" id="nav-users-count">—</span>
+    </button>
+    <button class="nav-item" onclick="showPage('pets-admin')">
+      <span class="nav-icon">🐾</span> 반려동물 관리
+      <span class="nav-badge" id="nav-pets-count">—</span>
+    </button>
+    <button class="nav-item" onclick="showPage('ingredients')">
+      <span class="nav-icon">🌿</span> 원재료 관리
+    </button>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="api-status">
+      <div class="api-dot" id="api-dot"></div>
+      <span class="api-label" id="api-label">연결 확인 중...</span>
+    </div>
+  </div>
+</div>
+
+<!-- ── 메인 ── -->
+<div class="main">
+
+  <!-- ══ 대시보드 ══ -->
+  <div class="page active" id="page-dashboard">
+    <div class="page-header">
+      <div class="page-title">대시보드</div>
+      <div class="page-sub">Petfolio DB 현황 요약</div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">전체 상품</div>
+        <div class="stat-value" id="d-total">—</div>
+        <div class="stat-sub">DB 등록 상품 수</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">바코드 매칭</div>
+        <div class="stat-value green" id="d-barcode">—</div>
+        <div class="stat-sub" id="d-barcode-sub">—개 미매칭</div>
+        <div class="stat-sub" id="d-barcode-total" style="margin-top:2px;color:#4A7C59"></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">이미지 보유</div>
+        <div class="stat-value green" id="d-image">—</div>
+        <div class="stat-sub" id="d-image-sub">—개 없음</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">원재료 보유</div>
+        <div class="stat-value amber" id="d-ingredients">—</div>
+        <div class="stat-sub" id="d-ingredients-sub">—개 없음</div>
+      </div>
+    </div>
+
+    <div class="stats-grid" style="margin-top:-8px">
+      <div class="stat-card">
+        <div class="stat-label">전체 브랜드</div>
+        <div class="stat-value" id="d-brands-total">—</div>
+        <div class="stat-sub">DB 등록 브랜드 수</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">브랜드 로고</div>
+        <div class="stat-value green" id="d-brands-logo">—</div>
+        <div class="stat-sub" id="d-brands-logo-sub">— 미등록</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">앱 노출 설정</div>
+        <div class="stat-value amber" id="d-brands-ordered">—</div>
+        <div class="stat-sub">순서 설정된 브랜드</div>
+      </div>
+      <div class="stat-card" style="cursor:pointer" onclick="showPage('brands')">
+        <div class="stat-label">브랜드 관리 →</div>
+        <div class="stat-value" style="font-size:20px">🏷️</div>
+        <div class="stat-sub">브랜드 탭으로 이동</div>
+      </div>
+    </div>
+
+    <div class="coverage-grid">
+      <div class="coverage-card">
+        <div class="coverage-header">
+          <div class="coverage-title">바코드 커버리지</div>
+          <div class="coverage-pct" id="cov-barcode-pct">0%</div>
+        </div>
+        <div class="cov-bar-track"><div class="cov-bar-fill" id="cov-barcode-bar" style="width:0%"></div></div>
+        <div class="cov-counts">
+          <span class="cov-count" id="cov-barcode-has">있음 0</span>
+          <span class="cov-count" id="cov-barcode-no">없음 0</span>
+        </div>
+      </div>
+      <div class="coverage-card">
+        <div class="coverage-header">
+          <div class="coverage-title">이미지 커버리지</div>
+          <div class="coverage-pct" id="cov-image-pct">0%</div>
+        </div>
+        <div class="cov-bar-track"><div class="cov-bar-fill amber" id="cov-image-bar" style="width:0%"></div></div>
+        <div class="cov-counts">
+          <span class="cov-count" id="cov-image-has">있음 0</span>
+          <span class="cov-count" id="cov-image-no">없음 0</span>
+        </div>
+      </div>
+      <div class="coverage-card">
+        <div class="coverage-header">
+          <div class="coverage-title">원재료 커버리지</div>
+          <div class="coverage-pct" id="cov-ing-pct">0%</div>
+        </div>
+        <div class="cov-bar-track"><div class="cov-bar-fill amber" id="cov-ing-bar" style="width:0%"></div></div>
+        <div class="cov-counts">
+          <span class="cov-count" id="cov-ing-has">있음 0</span>
+          <span class="cov-count" id="cov-ing-no">없음 0</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">최근 바코드 매칭</div>
+          <button class="btn btn-outline" onclick="showPage('barcode')" style="font-size:11px;padding:5px 10px;">전체 보기</button>
+        </div>
+        <div class="match-list" id="recent-matches-list">
+          <div style="padding:40px;text-align:center;color:#C2C9C5;font-size:13px">로딩 중...</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">스캔 로그</div>
+          <span class="card-count" id="scan-log-count">0건</span>
+        </div>
+        <div id="scan-log-list">
+          <div style="padding:40px;text-align:center;color:#C2C9C5;font-size:13px">스캔 기록이 없어요</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ 상품 관리 ══ -->
+  <div class="page" id="page-foods">
+    <div class="page-header">
+      <div class="page-title">상품 관리</div>
+      <div class="page-sub">전체 사료/간식 상품 목록</div>
+    </div>
+
+    <div class="stats-grid" style="grid-template-columns:repeat(4,1fr)">
+      <div class="stat-card">
+        <div class="stat-label">전체</div>
+        <div class="stat-value" id="f-total">—</div>
+      </div>
+      <div class="stat-card" style="cursor:pointer" onclick="setFoodsMissing('no_image')" title="이미지 없음 상품만 보기">
+        <div class="stat-label">이미지 없음</div>
+        <div class="stat-value red" id="f-no-image">—</div>
+      </div>
+      <div class="stat-card" style="cursor:pointer" onclick="setFoodsMissing('no_ingredients')" title="원재료 없음 상품만 보기">
+        <div class="stat-label">원재료 없음</div>
+        <div class="stat-value amber" id="f-no-ing">—</div>
+      </div>
+      <div class="stat-card" style="cursor:pointer" onclick="setFoodsMissing('no_brand')" title="브랜드 없음 상품만 보기">
+        <div class="stat-label">브랜드 없음</div>
+        <div class="stat-value red" id="f-no-brand">—</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">상품 목록</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span class="card-count" id="foods-table-count">0개</span>
+          <button class="btn btn-green" onclick="openFoodCreateModal()">+ 상품 등록</button>
+        </div>
+      </div>
+      <div class="toolbar">
+        <input class="search-input" id="foods-search" placeholder="상품명, 브랜드 검색..." oninput="filterFoods()">
+        <select class="filter-select" id="foods-cat" onchange="filterFoods()">
+          <option value="">전체 카테고리</option>
+          <option value="food">사료</option>
+          <option value="snack">간식</option>
+        </select>
+        <select class="filter-select" id="foods-species" onchange="filterFoods()">
+          <option value="">전체 종</option>
+          <option value="dog">강아지</option>
+          <option value="cat">고양이</option>
+        </select>
+        <select class="filter-select" id="foods-brand" onchange="filterFoods()" style="max-width:160px">
+          <option value="">전체 브랜드</option>
+        </select>
+        <select class="filter-select" id="foods-missing" onchange="filterFoods()">
+          <option value="">전체</option>
+          <option value="no_image">이미지 없음</option>
+          <option value="no_barcode">바코드 없음</option>
+          <option value="no_ingredients">원재료 없음</option>
+          <option value="no_brand">브랜드 없음</option>
+        </select>
+        <select class="filter-select" id="foods-perpage" onchange="foodsPerPage=+this.value;foodsPage=1;renderFoodsPage()">
+          <option value="20">20개</option>
+          <option value="50">50개</option>
+          <option value="100">100개</option>
+          <option value="200">200개</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:32%">상품</th>
+              <th>브랜드</th>
+              <th>카테고리</th>
+              <th>종</th>
+              <th>이미지</th>
+              <th>바코드</th>
+              <th>원재료</th>
+              <th>액션</th>
+            </tr>
+          </thead>
+          <tbody id="foods-tbody">
+            <tr class="loading-row"><td colspan="7">로딩 중...</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div id="foods-pagination"></div>
+    </div>
+  </div>
+
+  <!-- ══ 바코드 ══ -->
+  <div class="page" id="page-barcode">
+    <div class="page-header">
+      <div class="page-title">바코드 관리</div>
+      <div class="page-sub">상품 바코드 매칭 현황</div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">전체 상품</div>
+        <div class="stat-value" id="b-total">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">바코드 있음</div>
+        <div class="stat-value green" id="b-has">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">바코드 없음</div>
+        <div class="stat-value red" id="b-no">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">커버리지</div>
+        <div class="stat-value green" id="b-pct">—</div>
+      </div>
+    </div>
+
+    <!-- 바코드 탭 -->
+    <div style="display:flex;gap:8px;margin-bottom:16px">
+      <button class="btn btn-green" id="btab-matched" onclick="showBarcodeTab('matched')">✓ 매칭 완료</button>
+      <button class="btn btn-outline" id="btab-unmatched" onclick="showBarcodeTab('unmatched')">⚠ 미매칭</button>
+    </div>
+
+    <!-- 매칭 완료 탭 -->
+    <div id="barcode-tab-matched">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">바코드 매칭 상품</div>
+          <span class="card-count" id="matched-count">0개</span>
+        </div>
+        <div class="toolbar">
+          <input class="search-input" id="matched-search" placeholder="상품명, 바코드 검색..." oninput="filterMatched()">
+          <button class="btn btn-outline" onclick="loadMatchedFoods()">새로고침</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:45%">상품</th>
+                <th>바코드</th>
+                <th>카테고리</th>
+                <th>종</th>
+                <th>액션</th>
+              </tr>
+            </thead>
+            <tbody id="matched-tbody">
+              <tr class="loading-row"><td colspan="5">로딩 중...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 미매칭 탭 -->
+    <div id="barcode-tab-unmatched" style="display:none">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">바코드 미등록 상품</div>
+          <span class="card-count" id="unmatched-count">0개</span>
+        </div>
+        <div class="toolbar">
+          <input class="search-input" id="unmatched-search" placeholder="상품명, 브랜드 검색..." oninput="filterUnmatched()">
+          <select class="filter-select" id="unmatched-cat" onchange="filterUnmatched()">
+            <option value="">전체</option>
+            <option value="food">사료</option>
+            <option value="snack">간식</option>
+          </select>
+          <button class="btn btn-outline" onclick="loadUnmatchedFoods()">새로고침</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:40%">상품</th>
+                <th>카테고리</th>
+                <th>종</th>
+                <th>이미지</th>
+                <th>바코드 직접 입력</th>
+              </tr>
+            </thead>
+            <tbody id="unmatched-tbody">
+              <tr class="loading-row"><td colspan="5">로딩 중...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ 브랜드 ══ -->
+  <div class="page" id="page-brands">
+    <div class="page-header">
+      <div class="page-title">브랜드 관리</div>
+      <div class="page-sub">브랜드 신뢰 지표 및 정보 관리</div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">전체 브랜드</div>
+        <div class="stat-value" id="bs-total">—</div>
+        <div class="stat-sub">DB 등록 브랜드 수</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">로고 보유</div>
+        <div class="stat-value green" id="bs-logo">—</div>
+        <div class="stat-sub" id="bs-logo-sub">— 미등록</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">앱 노출 설정</div>
+        <div class="stat-value amber" id="bs-ordered">—</div>
+        <div class="stat-sub" id="bs-ordered-sub">순서 미설정 —개</div>
+      </div>
+    </div>
+
+    <!-- 앱 노출 브랜드 프리뷰 -->
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-header">
+        <div class="card-title">📱 앱 노출 중인 브랜드</div>
+        <span style="font-size:12px;color:#6B7570">순서(display_order) 설정된 브랜드 · 숫자 작을수록 앞에 노출</span>
+      </div>
+      <div style="background:#4A7C59;border-radius:12px;padding:12px 16px;overflow-x:auto;-webkit-overflow-scrolling:touch">
+        <div id="brand-preview-scroll" style="display:flex;gap:10px;min-width:max-content;padding-bottom:4px"></div>
+        <div id="brand-preview-empty" style="display:none;color:rgba(255,255,255,0.6);font-size:13px;padding:8px 0">
+          노출 순서가 설정된 브랜드가 없어요. 아래 테이블에서 순서 숫자를 입력하세요.
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">등록 브랜드</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span class="card-count" id="brands-count">0개</span>
+          <button class="btn btn-green" onclick="openBrandCreateModal()">+ 브랜드 등록</button>
+        </div>
+      </div>
+      <div class="toolbar">
+        <input class="search-input" id="brands-search" placeholder="브랜드명 검색..." oninput="filterBrands()">
+        <select class="filter-select" id="brands-perpage" onchange="brandsPerPage=+this.value;brandsPage=1;renderBrandsPage()">
+          <option value="20">20개</option>
+          <option value="50">50개</option>
+          <option value="100">100개</option>
+          <option value="200">200개</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>로고</th>
+              <th>브랜드</th>
+              <th>국가</th>
+              <th>상품 수</th>
+              <th>순서</th>
+              <th>연구팀</th>
+              <th>Feeding Trial</th>
+              <th>WSAVA</th>
+              <th>자체공장</th>
+              <th>리콜이력</th>
+              <th>액션</th>
+            </tr>
+          </thead>
+          <tbody id="brands-tbody">
+            <tr class="loading-row"><td colspan="11">로딩 중...</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div id="brands-pagination"></div>
+    </div>
+  </div>
+
+  <!-- ══ 유저 관리 ══ -->
+  <div class="page" id="page-users">
+    <div class="page-header">
+      <div class="page-title">유저 관리</div>
+      <div class="page-sub">가입한 유저 데이터 조회</div>
+    </div>
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-label">전체 유저</div><div class="stat-value" id="u-total">—</div></div>
+      <div class="stat-card"><div class="stat-label">활성 유저</div><div class="stat-value green" id="u-active">—</div></div>
+      <div class="stat-card"><div class="stat-label">카카오 로그인</div><div class="stat-value" id="u-kakao">—</div></div>
+      <div class="stat-card"><div class="stat-label">전체 반려동물</div><div class="stat-value" id="u-pets">—</div></div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">유저 목록</div>
+        <span class="card-count" id="users-count">0명</span>
+      </div>
+      <div class="toolbar">
+        <input class="search-input" id="users-search" placeholder="이름, 이메일 검색..." oninput="filterUsers()">
+        <select class="filter-select" id="users-active" onchange="filterUsers()">
+          <option value="">전체</option>
+          <option value="true">활성</option>
+          <option value="false">비활성</option>
+        </select>
+        <button class="btn btn-outline" onclick="loadUsers()">새로고침</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>이름</th>
+              <th>이메일</th>
+              <th>로그인 방식</th>
+              <th>반려동물</th>
+              <th>상태</th>
+              <th>가입일</th>
+              <th>액션</th>
+            </tr>
+          </thead>
+          <tbody id="users-tbody"><tr class="loading-row"><td colspan="7">로딩 중...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ 반려동물 관리 ══ -->
+  <div class="page" id="page-pets-admin">
+    <div class="page-header">
+      <div class="page-title">반려동물 관리</div>
+      <div class="page-sub">등록된 반려동물 현황</div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">반려동물 목록</div>
+        <span class="card-count" id="pets-admin-count">0마리</span>
+      </div>
+      <div class="toolbar">
+        <input class="search-input" id="pets-admin-search" placeholder="이름, 견종, 보호자 검색..." oninput="filterPetsAdmin()">
+        <select class="filter-select" id="pets-admin-species" onchange="filterPetsAdmin()">
+          <option value="">전체</option>
+          <option value="dog">강아지</option>
+          <option value="cat">고양이</option>
+        </select>
+        <button class="btn btn-outline" onclick="loadPetsAdmin()">새로고침</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>이름</th>
+              <th>종/견종</th>
+              <th>나이</th>
+              <th>체중</th>
+              <th>중성화</th>
+              <th>보호자</th>
+              <th>가입일</th>
+              <th>액션</th>
+            </tr>
+          </thead>
+          <tbody id="pets-admin-tbody"><tr class="loading-row"><td colspan="8">로딩 중...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ 원재료 관리 ══ -->
+  <div class="page" id="page-ingredients">
+    <div class="page-header">
+      <div class="page-title">원재료 관리</div>
+      <div class="page-sub">원재료 등록 및 등급 관리</div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">원재료 목록</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span class="card-count" id="ingredients-count">0개</span>
+          <button class="btn btn-green" onclick="openIngredientCreateModal()">+ 원재료 등록</button>
+        </div>
+      </div>
+      <div class="toolbar">
+        <input class="search-input" id="ingredients-search" placeholder="원재료명 검색..." oninput="filterIngredients()">
+        <select class="filter-select" id="ingredients-grade" onchange="filterIngredients()">
+          <option value="">전체 등급</option>
+          <option value="S+">S+</option>
+          <option value="S">S</option>
+          <option value="A">A</option>
+          <option value="B">B</option>
+          <option value="B-">B-</option>
+          <option value="C">C</option>
+          <option value="C-">C-</option>
+          <option value="D">D</option>
+        </select>
+        <select class="filter-select" id="ingredients-category" onchange="filterIngredients()">
+          <option value="">전체 카테고리</option>
+          <option value="육류">육류</option>
+          <option value="곡물">곡물</option>
+          <option value="채소">채소</option>
+          <option value="과일">과일</option>
+          <option value="첨가물">첨가물</option>
+          <option value="방부제">방부제</option>
+          <option value="기능성">기능성</option>
+        </select>
+        <select class="filter-select" id="ingredients-perpage" onchange="ingredientsPerPage=+this.value;ingredientsPage=1;renderIngredientsPage()">
+          <option value="20">20개</option>
+          <option value="50">50개</option>
+          <option value="100">100개</option>
+          <option value="200">200개</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>원재료명</th>
+              <th>영문명</th>
+              <th>등급</th>
+              <th>카테고리</th>
+              <th>위험</th>
+              <th>알레르기</th>
+              <th>액션</th>
+            </tr>
+          </thead>
+          <tbody id="ingredients-tbody"><tr class="loading-row"><td colspan="7">로딩 중...</td></tr></tbody>
+        </table>
+      </div>
+      <div id="ingredients-pagination"></div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<!-- ── 수동 매칭 모달 ── -->
+<div class="modal-overlay" id="match-modal">
+  <div class="modal">
+    <div class="modal-title">수동 바코드 매칭</div>
+    <div style="background:#EBF2EE;border-radius:10px;padding:12px 14px;margin-bottom:14px">
+      <div style="font-size:11px;color:#4A7C59;font-weight:700;margin-bottom:4px">상품</div>
+      <div style="font-size:13px;font-weight:600" id="modal-food-name">—</div>
+    </div>
+    <div class="modal-label">바코드 번호 입력</div>
+    <input class="modal-input" id="modal-barcode-input" placeholder="8~13자리 숫자 입력" style="font-family:'Courier New',monospace" maxlength="14">
+    <div class="modal-label">검색으로 확인</div>
+    <input class="modal-input" id="modal-search-input" placeholder="제품명 검색해서 맞는지 확인" oninput="searchModalFoods()">
+    <div class="modal-results" id="modal-results"></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal()">취소</button>
+      <button class="btn btn-green" onclick="saveManualMatch()">매칭 저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── 원재료 등록 모달 ── -->
+<div class="modal-overlay" id="ingredient-create-modal">
+  <div class="modal" style="width:460px">
+    <div class="modal-title">원재료 등록</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div>
+        <div class="modal-label">원재료명 *</div>
+        <input class="modal-input" id="ic-name" placeholder="예) 닭고기">
+      </div>
+      <div>
+        <div class="modal-label">영문명</div>
+        <input class="modal-input" id="ic-name-en" placeholder="예) Chicken">
+      </div>
+      <div>
+        <div class="modal-label">등급</div>
+        <select class="modal-input" id="ic-grade">
+          <option value="">선택</option>
+          <option value="S+">S+ (최우수)</option>
+          <option value="S">S (우수)</option>
+          <option value="A">A (양호)</option>
+          <option value="B">B (보통)</option>
+          <option value="B-">B- (보통 이하)</option>
+          <option value="C">C (주의)</option>
+          <option value="C-">C- (경고)</option>
+          <option value="D">D (위험)</option>
+        </select>
+      </div>
+      <div>
+        <div class="modal-label">카테고리</div>
+        <select class="modal-input" id="ic-category">
+          <option value="">선택</option>
+          <option value="육류">육류</option>
+          <option value="곡물">곡물</option>
+          <option value="채소">채소</option>
+          <option value="과일">과일</option>
+          <option value="첨가물">첨가물</option>
+          <option value="방부제">방부제</option>
+          <option value="기능성">기능성</option>
+        </select>
+      </div>
+    </div>
+    <div>
+      <div class="modal-label">설명</div>
+      <textarea class="modal-input" id="ic-desc" rows="2" placeholder="원재료 설명..." style="resize:vertical"></textarea>
+    </div>
+    <div style="display:flex;gap:16px;margin-top:10px">
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+        <input type="checkbox" id="ic-harmful"> 위험 성분
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+        <input type="checkbox" id="ic-allergen"> 알레르기 유발
+      </label>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeIngredientCreateModal()">취소</button>
+      <button class="btn btn-green" onclick="saveIngredientCreate()">등록</button>
+    </div>
+  </div>
+</div>
+
+<!-- 토스트 -->
+<div class="toast" id="toast"></div>
+
+<script>
+const API = 'http://127.0.0.1:8000/api/v1';
+
+let allFoods = [];
+let filteredFoods = [], foodsPage = 1, foodsPerPage = 20;
+let filteredBrands = [], brandsPage = 1, brandsPerPage = 20;
+let filteredIngredients = [], ingredientsPage = 1, ingredientsPerPage = 20;
+
+function renderPagination(containerId, total, page, perPage, gotoFn) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  if (total === 0) { el.innerHTML = ''; return; }
+  const totalPages = Math.ceil(total / perPage);
+  const start = (page - 1) * perPage + 1;
+  const end = Math.min(page * perPage, total);
+  let pageButtons = '';
+  for (let i = 1; i <= totalPages; i++) {
+    if (i === 1 || i === totalPages || Math.abs(i - page) <= 1) {
+      pageButtons += `<button class="page-btn${i === page ? ' active' : ''}" onclick="${gotoFn}(${i})">${i}</button>`;
+    } else if (Math.abs(i - page) === 2) {
+      pageButtons += `<span class="page-ellipsis">…</span>`;
+    }
+  }
+  el.innerHTML = `<div class="pagination-bar">
+    <span class="pagination-info">${total.toLocaleString()}개 중 ${start}–${end}</span>
+    <div class="pagination-pages">
+      <button class="page-btn" onclick="${gotoFn}(${page - 1})" ${page <= 1 ? 'disabled' : ''}>‹</button>
+      ${pageButtons}
+      <button class="page-btn" onclick="${gotoFn}(${page + 1})" ${page >= totalPages ? 'disabled' : ''}>›</button>
+    </div>
+  </div>`;
+}
+let matchedFoods = [];
+let unmatchedFoods = [];
+let allBrands = [];
+let currentModalFoodId = null;
+let stats = {};
+
+// ── 페이지 전환 ───────────────────────────────────────────────
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  const pages = ['dashboard','foods','barcode','brands','users','pets-admin','ingredients'];
+  const idx = pages.indexOf(name);
+  if (idx >= 0) document.querySelectorAll('.nav-item')[idx].classList.add('active');
+
+  if (name === 'foods' && allFoods.length === 0) loadFoods();
+  if (name === 'barcode') { loadBarcodeStats(); loadMatchedFoods(); loadUnmatchedFoods(); }
+  if (name === 'brands') {
+    if (allFoods.length === 0) loadFoods();  // 상품 수 표시를 위해 필요
+    if (allBrands.length === 0) loadBrands();
+    else { filterBrands(); renderBrandPreview(); renderBrandStats(); }
+  }
+  if (name === 'users') loadUsers();
+  if (name === 'pets-admin') loadPetsAdmin();
+  if (name === 'ingredients') loadIngredients();
+}
+
+// ── 토스트 ────────────────────────────────────────────────────
+function toast(msg, color) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.background = color === 'red' ? '#D94F3D' : '#1A1F1C';
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ── API 상태 확인 ─────────────────────────────────────────────
+async function checkApi() {
+  try {
+    const r = await fetch(API.replace('/api/v1','') + '/health', {signal: AbortSignal.timeout(4000)});
+    const ok = r.ok;
+    document.getElementById('api-dot').className = 'api-dot' + (ok ? '' : ' offline');
+    document.getElementById('api-label').textContent = ok ? 'API 연결됨' : 'API 연결 실패';
+  } catch {
+    document.getElementById('api-dot').className = 'api-dot offline';
+    document.getElementById('api-label').textContent = 'API 오프라인';
+  }
+}
+
+// ── 대시보드 통계 ─────────────────────────────────────────────
+async function loadDashboard() {
+  try {
+    const [statsRes, matchedRes] = await Promise.all([
+      fetch(`${API}/foods/admin/barcode-stats`),
+      fetch(`${API}/foods/admin/recent-matches?limit=8`),
+    ]);
+
+    if (statsRes.ok) {
+      stats = await statsRes.json();
+      document.getElementById('d-total').textContent = (stats.total_foods || 0).toLocaleString();
+      document.getElementById('d-barcode').textContent = (stats.has_barcode || 0).toLocaleString();
+      document.getElementById('d-barcode-sub').textContent = `${(stats.no_barcode || 0).toLocaleString()}개 미매칭`;
+      if (stats.total_barcodes != null) {
+        const el = document.getElementById('d-barcode-total');
+        el.textContent = `바코드 총 ${(stats.total_barcodes||0).toLocaleString()}개 등록`;
+      }
+      document.getElementById('d-image').textContent = (stats.has_image || 0).toLocaleString();
+      document.getElementById('d-image-sub').textContent = `${(stats.no_image || 0).toLocaleString()}개 없음`;
+      document.getElementById('d-ingredients').textContent = (stats.has_ingredients || 0).toLocaleString();
+      document.getElementById('d-ingredients-sub').textContent = `${(stats.no_ingredients || 0).toLocaleString()}개 없음`;
+
+      // 커버리지 바
+      const setPct = (id, barId, hasId, noId, has, no) => {
+        const total = has + no;
+        const pct = total ? Math.round(has / total * 100) : 0;
+        document.getElementById(id).textContent = pct + '%';
+        document.getElementById(barId).style.width = pct + '%';
+        document.getElementById(hasId).textContent = '있음 ' + has.toLocaleString();
+        document.getElementById(noId).textContent = '없음 ' + no.toLocaleString();
+      };
+      setPct('cov-barcode-pct','cov-barcode-bar','cov-barcode-has','cov-barcode-no', stats.has_barcode||0, stats.no_barcode||0);
+      setPct('cov-image-pct','cov-image-bar','cov-image-has','cov-image-no', stats.has_image||0, stats.no_image||0);
+      setPct('cov-ing-pct','cov-ing-bar','cov-ing-has','cov-ing-no', stats.has_ingredients||0, stats.no_ingredients||0);
+
+      // 네비 뱃지
+      document.getElementById('nav-foods-count').textContent = (stats.total_foods||0).toLocaleString();
+      document.getElementById('nav-barcode-count').textContent = (stats.has_barcode||0) + '/' + (stats.total_foods||0);
+
+      // 상품 탭 통계
+      document.getElementById('f-total').textContent = (stats.total_foods||0).toLocaleString();
+      document.getElementById('f-no-image').textContent = (stats.no_image||0).toLocaleString();
+      document.getElementById('f-no-ing').textContent = (stats.no_ingredients||0).toLocaleString();
+
+      // 바코드 탭 통계
+      document.getElementById('b-total').textContent = (stats.total_foods||0).toLocaleString();
+      document.getElementById('b-has').textContent = (stats.has_barcode||0).toLocaleString();
+      document.getElementById('b-no').textContent = (stats.no_barcode||0).toLocaleString();
+      document.getElementById('b-pct').textContent = (stats.coverage_pct||0) + '%';
+    }
+
+    if (matchedRes.ok) {
+      const matched = await matchedRes.json();
+      renderRecentMatches(matched);
+    }
+
+    // 브랜드 stats (allBrands가 로드됐으면 즉시, 아니면 별도 fetch)
+    const brandsForDash = allBrands.length ? allBrands : await fetch(`${API}/brands`).then(r => r.json()).catch(() => []);
+    if (!allBrands.length) allBrands = brandsForDash;
+    const bTotal = brandsForDash.length;
+    const bLogo = brandsForDash.filter(b => b.logo_url).length;
+    const bOrdered = brandsForDash.filter(b => b.display_order != null).length;
+    document.getElementById('d-brands-total').textContent = bTotal;
+    document.getElementById('d-brands-logo').textContent = bLogo;
+    document.getElementById('d-brands-logo-sub').textContent = `${bTotal - bLogo}개 미등록`;
+    document.getElementById('d-brands-ordered').textContent = bOrdered;
+    const logoEl = document.getElementById('d-brands-logo');
+    logoEl.className = 'stat-value ' + (bTotal && bLogo / bTotal >= 0.5 ? 'green' : 'red');
+  } catch(e) {
+    console.error(e);
+  }
+}
+
+function renderRecentMatches(foods) {
+  const el = document.getElementById('recent-matches-list');
+  if (!foods.length) {
+    el.innerHTML = '<div style="padding:40px;text-align:center;color:#C2C9C5;font-size:13px">매칭된 바코드가 없어요</div>';
+    return;
+  }
+  el.innerHTML = foods.map(f => `
+    <div class="match-item">
+      <div class="match-icon">${f.category === 'snack' ? '🦴' : '📦'}</div>
+      <div class="match-info">
+        <div class="match-name">${(f.brand||'')} ${(f.name||'').slice(0,30)}</div>
+        <div class="match-barcode">${f.barcode || '—'}</div>
+      </div>
+      <span class="badge badge-green">매칭</span>
+    </div>
+  `).join('');
+}
+
+// ── 상품 탭 ───────────────────────────────────────────────────
+async function loadFoods() {
+  try {
+    const r = await fetch(`${API}/foods?limit=99999`);
+    if (!r.ok) return;
+    allFoods = await r.json();
+    // 브랜드 드롭다운 채우기
+    const brandSet = [...new Set(allFoods.map(f => f.brand).filter(Boolean))].sort();
+    const sel = document.getElementById('foods-brand');
+    sel.innerHTML = '<option value="">전체 브랜드</option>' + brandSet.map(b => `<option value="${b.replace(/"/g,'&quot;')}">${b}</option>`).join('');
+    filterFoods();
+  } catch(e) { console.error(e); }
+}
+
+function filterFoods() {
+  const q = document.getElementById('foods-search').value.toLowerCase();
+  const cat = document.getElementById('foods-cat').value;
+  const species = document.getElementById('foods-species').value;
+  const missing = document.getElementById('foods-missing').value;
+  const brand = document.getElementById('foods-brand').value;
+  filteredFoods = allFoods.filter(f => {
+    const matchQ = !q || (f.name||'').toLowerCase().includes(q) || (f.brand||'').toLowerCase().includes(q);
+    const matchCat = !cat || f.category === cat;
+    const matchSpecies = !species || f.target_species === species || f.target_species === 'both';
+    const matchMissing = !missing ||
+      (missing === 'no_image' && !f.image_url) ||
+      (missing === 'no_barcode' && !f.barcode) ||
+      (missing === 'no_ingredients' && !f.ingredients) ||
+      (missing === 'no_brand' && !f.brand);
+    const matchBrand = !brand || (f.brand||'') === brand;
+    return matchQ && matchCat && matchSpecies && matchMissing && matchBrand;
+  });
+  foodsPage = 1;
+  renderFoodsPage();
+  // 브랜드 없음 개수 갱신 (allFoods 기준)
+  const noBrand = allFoods.filter(f => !f.brand).length;
+  document.getElementById('f-no-brand').textContent = noBrand.toLocaleString();
+}
+
+function setFoodsMissing(value) {
+  document.getElementById('foods-missing').value = value;
+  filterFoods();
+}
+
+function gotoFoodsPage(p) {
+  const totalPages = Math.ceil(filteredFoods.length / foodsPerPage);
+  foodsPage = Math.max(1, Math.min(p, totalPages));
+  renderFoodsPage();
+}
+
+function renderFoodsPage() {
+  document.getElementById('foods-table-count').textContent = filteredFoods.length + '개';
+  const tbody = document.getElementById('foods-tbody');
+  if (!filteredFoods.length) {
+    tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">📭</div><div class="empty-title">검색 결과가 없어요</div></div></td></tr>';
+    document.getElementById('foods-pagination').innerHTML = '';
+    return;
+  }
+  const slice = filteredFoods.slice((foodsPage - 1) * foodsPerPage, foodsPage * foodsPerPage);
+  tbody.innerHTML = slice.map(f => `
+    <tr>
+      <td>
+        <div class="food-cell">
+          <div class="food-thumb">
+            ${f.image_url ? `<img src="${f.image_url}" onerror="this.parentNode.textContent='📦'">` : (f.category==='snack'?'🦴':'📦')}
+          </div>
+          <div>
+            <div class="food-brand">${f.brand||''}</div>
+            <div class="food-name">${f.name||''}</div>
+          </div>
+        </div>
+      </td>
+      <td style="font-size:12px;font-weight:700;color:#4A7C59;cursor:pointer" onclick="document.getElementById('foods-brand').value='${(f.brand||'').replace(/'/g,"\\'")}';filterFoods()">${f.brand||'—'}</td>
+      <td><span class="badge ${f.category==='food'?'badge-green':'badge-amber'}">${f.category==='food'?'사료':f.category==='snack'?'간식':f.category}</span></td>
+      <td>${f.target_species==='dog'?'🐶':f.target_species==='cat'?'🐱':'🐾'}</td>
+      <td><span class="badge ${f.image_url?'badge-green':'badge-red'}">${f.image_url?'✓ 있음':'✗ 없음'}</span></td>
+      <td><span class="badge ${f.barcode?'badge-green':'badge-gray'}">${f.barcode?f.barcode.slice(0,8)+'…':'없음'}</span></td>
+      <td><span class="badge ${f.ingredients?'badge-green':'badge-red'}">${f.ingredients?'✓ 있음':'✗ 없음'}</span></td>
+      <td><button class="btn-sm btn-outline" style="background:white;color:#4A7C59;border:1px solid #C2C9C5" onclick="openFoodDetail('${f.id}')">상세</button></td>
+    </tr>
+  `).join('');
+  renderPagination('foods-pagination', filteredFoods.length, foodsPage, foodsPerPage, 'gotoFoodsPage');
+}
+
+// ── 바코드 탭 전환 ────────────────────────────────────────────
+function showBarcodeTab(tab) {
+  document.getElementById('barcode-tab-matched').style.display = tab === 'matched' ? 'block' : 'none';
+  document.getElementById('barcode-tab-unmatched').style.display = tab === 'unmatched' ? 'block' : 'none';
+  document.getElementById('btab-matched').className = 'btn ' + (tab==='matched' ? 'btn-green' : 'btn-outline');
+  document.getElementById('btab-unmatched').className = 'btn ' + (tab==='unmatched' ? 'btn-green' : 'btn-outline');
+}
+
+// ── 바코드 통계 ───────────────────────────────────────────────
+async function loadBarcodeStats() {
+  try {
+    const r = await fetch(`${API}/foods/admin/barcode-stats`);
+    if (!r.ok) return;
+    const s = await r.json();
+    document.getElementById('b-total').textContent = (s.total_foods||0).toLocaleString();
+    document.getElementById('b-has').textContent = (s.has_barcode||0).toLocaleString();
+    document.getElementById('b-no').textContent = (s.no_barcode||0).toLocaleString();
+    document.getElementById('b-pct').textContent = (s.coverage_pct||0) + '%';
+  } catch(e) {}
+}
+
+// ── 매칭 완료 목록 ────────────────────────────────────────────
+async function loadMatchedFoods() {
+  try {
+    const r = await fetch(`${API}/foods/admin/recent-matches?limit=200`);
+    if (!r.ok) return;
+    matchedFoods = await r.json();
+    document.getElementById('matched-count').textContent = matchedFoods.length + '개';
+    filterMatched();
+  } catch(e) {}
+}
+
+function filterMatched() {
+  const q = document.getElementById('matched-search').value.toLowerCase();
+  const list = matchedFoods.filter(f =>
+    (f.name||'').toLowerCase().includes(q) ||
+    (f.brand||'').toLowerCase().includes(q) ||
+    (f.barcode||'').includes(q)
+  );
+  const tbody = document.getElementById('matched-tbody');
+  if (!list.length) {
+    tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><div class="empty-icon">📭</div><div class="empty-title">결과 없음</div></div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = list.map(f => `
+    <tr>
+      <td>
+        <div class="food-cell">
+          <div class="food-thumb">
+            ${f.image_url ? `<img src="${f.image_url}" onerror="this.parentNode.textContent='📦'">` : (f.category==='snack'?'🦴':'📦')}
+          </div>
+          <div>
+            <div class="food-brand">${f.brand||''}</div>
+            <div class="food-name">${f.name||''}</div>
+          </div>
+        </div>
+      </td>
+      <td><span class="barcode-mono">${f.barcode||'—'}</span></td>
+      <td><span class="badge ${f.category==='food'?'badge-green':'badge-amber'}">${f.category==='food'?'사료':'간식'}</span></td>
+      <td>${f.target_species==='dog'?'🐶':f.target_species==='cat'?'🐱':'🐾'}</td>
+      <td>
+        <button class="btn-sm btn-red" onclick="removeBarcode('${f.id}','${f.barcode}')">해제</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+// ── 미매칭 목록 ───────────────────────────────────────────────
+async function loadUnmatchedFoods() {
+  try {
+    const r = await fetch(`${API}/foods?limit=99999`);
+    if (!r.ok) return;
+    const all = await r.json();
+    unmatchedFoods = all.filter(f => !f.barcode);
+    document.getElementById('unmatched-count').textContent = unmatchedFoods.length + '개';
+    filterUnmatched();
+  } catch(e) {}
+}
+
+function filterUnmatched() {
+  const q = document.getElementById('unmatched-search').value.toLowerCase();
+  const cat = document.getElementById('unmatched-cat').value;
+  const list = unmatchedFoods.filter(f => {
+    const mq = !q || (f.name||'').toLowerCase().includes(q) || (f.brand||'').toLowerCase().includes(q);
+    const mc = !cat || f.category === cat;
+    return mq && mc;
+  });
+  const tbody = document.getElementById('unmatched-tbody');
+  if (!list.length) {
+    tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><div class="empty-icon">🎉</div><div class="empty-title">모든 상품에 바코드가 등록됐어요!</div></div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = list.slice(0,100).map(f => `
+    <tr>
+      <td>
+        <div class="food-cell">
+          <div class="food-thumb">
+            ${f.image_url ? `<img src="${f.image_url}" onerror="this.parentNode.textContent='📦'">` : (f.category==='snack'?'🦴':'📦')}
+          </div>
+          <div>
+            <div class="food-brand">${f.brand||''}</div>
+            <div class="food-name">${f.name||''}</div>
+          </div>
+        </div>
+      </td>
+      <td><span class="badge ${f.category==='food'?'badge-green':'badge-amber'}">${f.category==='food'?'사료':'간식'}</span></td>
+      <td>${f.target_species==='dog'?'🐶':f.target_species==='cat'?'🐱':'🐾'}</td>
+      <td><span class="badge ${f.image_url?'badge-green':'badge-red'}">${f.image_url?'✓':'✗'}</span></td>
+      <td>
+        <div class="barcode-input-wrap">
+          <input class="barcode-inline-input" id="bi-${f.id}" placeholder="바코드 입력" maxlength="14">
+          <button class="btn-sm btn-green" onclick="saveInlineBarcode('${f.id}')">저장</button>
+          <button class="btn-sm btn-outline" style="background:white;color:#4A7C59;border:1px solid #4A7C59" onclick="openMatchModal('${f.id}','${(f.brand||'')} ${(f.name||'').slice(0,20)}')">검색</button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+// ── 인라인 바코드 저장 ────────────────────────────────────────
+async function saveInlineBarcode(foodId) {
+  const input = document.getElementById('bi-' + foodId);
+  const barcode = (input?.value || '').trim();
+  if (!barcode || !/^\d{8,14}$/.test(barcode)) {
+    toast('8~14자리 숫자만 입력해주세요', 'red'); return;
+  }
+  try {
+    const r = await fetch(`${API}/foods/barcode/match`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ food_id: foodId, barcode, matched_by: 'admin' })
+    });
+    if (r.ok) {
+      toast('바코드가 저장됐어요 ✓');
+      loadUnmatchedFoods(); loadMatchedFoods(); loadBarcodeStats();
+    } else {
+      const err = await r.json();
+      toast(err.detail || '저장 실패', 'red');
+    }
+  } catch { toast('저장 중 오류', 'red'); }
+}
+
+// ── 바코드 해제 ───────────────────────────────────────────────
+async function removeBarcode(foodId, barcode) {
+  if (!confirm(`바코드 ${barcode} 매칭을 해제할까요?`)) return;
+  try {
+    const r = await fetch(`${API}/foods/${foodId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ barcode: null })
+    });
+    if (r.ok) {
+      toast('매칭 해제됐어요');
+      loadMatchedFoods(); loadBarcodeStats(); loadDashboard();
+    } else toast('해제 실패', 'red');
+  } catch { toast('오류 발생', 'red'); }
+}
+
+// ── 수동 매칭 모달 ────────────────────────────────────────────
+function openMatchModal(foodId, foodName) {
+  currentModalFoodId = foodId;
+  document.getElementById('modal-food-name').textContent = foodName;
+  document.getElementById('modal-barcode-input').value = '';
+  document.getElementById('modal-search-input').value = '';
+  document.getElementById('modal-results').innerHTML = '';
+  document.getElementById('match-modal').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('match-modal').classList.remove('open');
+  currentModalFoodId = null;
+}
+
+async function searchModalFoods() {
+  const q = document.getElementById('modal-search-input').value.trim();
+  if (q.length < 2) { document.getElementById('modal-results').innerHTML = ''; return; }
+  try {
+    const r = await fetch(`${API}/foods?q=${encodeURIComponent(q)}&limit=5`);
+    if (!r.ok) return;
+    const foods = await r.json();
+    const el = document.getElementById('modal-results');
+    if (!foods.length) { el.innerHTML = '<div style="padding:20px;text-align:center;color:#C2C9C5;font-size:13px">검색 결과 없음</div>'; return; }
+    el.innerHTML = foods.map(f => `
+      <div class="modal-food-item" onclick="selectModalFood('${f.id}','${(f.brand||'')} ${(f.name||'').slice(0,25)}')">
+        <div style="font-size:20px">${f.category==='snack'?'🦴':'📦'}</div>
+        <div>
+          <div style="font-size:10px;color:#6B7570;font-weight:700;text-transform:uppercase">${f.brand||''}</div>
+          <div style="font-size:13px;font-weight:600">${(f.name||'').slice(0,40)}</div>
+        </div>
+      </div>
+    `).join('');
+  } catch {}
+}
+
+function selectModalFood(foodId, foodName) {
+  currentModalFoodId = foodId;
+  document.getElementById('modal-food-name').textContent = foodName;
+  document.querySelectorAll('.modal-food-item').forEach(el => el.classList.remove('selected'));
+  event.currentTarget.classList.add('selected');
+}
+
+async function saveManualMatch() {
+  const barcode = document.getElementById('modal-barcode-input').value.trim();
+  if (!barcode || !/^\d{8,14}$/.test(barcode)) { toast('8~14자리 숫자 바코드 입력해주세요', 'red'); return; }
+  if (!currentModalFoodId) { toast('상품을 먼저 선택해주세요', 'red'); return; }
+  try {
+    const r = await fetch(`${API}/foods/barcode/match`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ food_id: currentModalFoodId, barcode, matched_by: 'admin' })
+    });
+    if (r.ok) {
+      toast('바코드가 매칭됐어요 ✓');
+      closeModal();
+      loadUnmatchedFoods(); loadMatchedFoods(); loadBarcodeStats(); loadDashboard();
+    } else {
+      const err = await r.json();
+      toast(err.detail || '매칭 실패', 'red');
+    }
+  } catch { toast('오류 발생', 'red'); }
+}
+
+// ── 브랜드 탭 ─────────────────────────────────────────────────
+async function loadBrands() {
+  try {
+    const r = await fetch(`${API}/brands`);
+    if (!r.ok) return;
+    allBrands = await r.json();
+    document.getElementById('brands-count').textContent = allBrands.length + '개';
+    filterBrands();
+    renderBrandPreview();
+    renderBrandStats();
+  } catch(e) { console.error(e); }
+}
+
+function renderBrandStats() {
+  const total = allBrands.length;
+  const hasLogo = allBrands.filter(b => b.logo_url).length;
+  const hasOrder = allBrands.filter(b => b.display_order != null).length;
+  document.getElementById('bs-total').textContent = total;
+  document.getElementById('bs-logo').textContent = hasLogo;
+  document.getElementById('bs-logo-sub').textContent = `${total - hasLogo}개 미등록`;
+  document.getElementById('bs-ordered').textContent = hasOrder;
+  document.getElementById('bs-ordered-sub').textContent = `순서 미설정 ${total - hasOrder}개`;
+
+  // 로고 미등록이 많으면 빨간색
+  const logoEl = document.getElementById('bs-logo');
+  logoEl.className = 'stat-value ' + (hasLogo / total >= 0.5 ? 'green' : 'red');
+}
+
+function filterBrands() {
+  const q = document.getElementById('brands-search').value.toLowerCase();
+  filteredBrands = allBrands.filter(b => (b.name||'').toLowerCase().includes(q) || (b.name_en||'').toLowerCase().includes(q));
+  brandsPage = 1;
+  renderBrandsPage();
+}
+
+function gotoBrandsPage(p) {
+  const totalPages = Math.ceil(filteredBrands.length / brandsPerPage);
+  brandsPage = Math.max(1, Math.min(p, totalPages));
+  renderBrandsPage();
+}
+
+function renderBrandPreview() {
+  const COLORS = ['#EBF2EE','#FFF3E0','#E8EAF6','#FCE4EC','#E0F7FA','#F3E5F5','#E8F5E9','#FFF8E1'];
+  const ordered = allBrands
+    .filter(b => b.display_order != null)
+    .sort((a, b) => a.display_order - b.display_order);
+  const container = document.getElementById('brand-preview-scroll');
+  const empty = document.getElementById('brand-preview-empty');
+  if (!ordered.length) {
+    container.style.display = 'none';
+    empty.style.display = 'block';
+    return;
+  }
+  container.style.display = 'flex';
+  empty.style.display = 'none';
+  container.innerHTML = ordered.map((b, idx) => {
+    const bg = COLORS[idx % COLORS.length];
+    const inner = b.logo_url
+      ? `<img src="${b.logo_url}" style="width:56px;height:36px;object-fit:contain;border-radius:6px" onerror="this.parentElement.innerHTML='<span style=\\'font-size:11px;font-weight:800;color:#1A1F1C;text-align:center;word-break:keep-all;\\'>${b.name}</span>'">`
+      : `<span style="font-size:11px;font-weight:800;color:#1A1F1C;text-align:center;word-break:keep-all;line-height:1.3">${b.name}</span>`;
+    return `
+      <div style="display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer" onclick="openBrandDetail('${b.id}')">
+        <div style="width:80px;height:48px;border-radius:12px;background:${bg};display:flex;align-items:center;justify-content:center;padding:6px;box-sizing:border-box;position:relative">
+          <span style="position:absolute;top:3px;left:5px;font-size:9px;font-weight:800;color:rgba(0,0,0,0.3)">${b.display_order}</span>
+          ${inner}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function renderBrandsPage() {
+  const tbody = document.getElementById('brands-tbody');
+  if (!filteredBrands.length) {
+    tbody.innerHTML = '<tr><td colspan="11"><div class="empty-state"><div class="empty-icon">📭</div><div class="empty-title">결과 없음</div></div></td></tr>';
+    document.getElementById('brands-pagination').innerHTML = '';
+    return;
+  }
+  // 브랜드별 상품 수 (allFoods 로드됐으면 사용, 아니면 —)
+  const foodCountMap = {};
+  if (allFoods.length) {
+    allFoods.forEach(f => { foodCountMap[f.brand||''] = (foodCountMap[f.brand||''] || 0) + 1; });
+  }
+  const check = v => v ? '<span class="badge badge-green">✓</span>' : '<span class="badge badge-gray">–</span>';
+  const slice = filteredBrands.slice((brandsPage - 1) * brandsPerPage, brandsPage * brandsPerPage);
+  tbody.innerHTML = slice.map(b => {
+    const cnt = foodCountMap[b.name||''];
+    const cntHtml = cnt != null
+      ? `<span style="font-size:13px;font-weight:700;color:#1A1F1C;cursor:pointer" title="${b.name} 상품만 보기" onclick="showPage('foods');document.getElementById('foods-brand').value='${(b.name||'').replace(/'/g,"\\'")}';filterFoods()">${cnt.toLocaleString()}개</span>`
+      : '<span style="color:#C2C9C5;font-size:12px">—</span>';
+    return `
+    <tr>
+      <td>
+        ${b.logo_url
+          ? `<img src="${b.logo_url}" style="width:32px;height:32px;object-fit:contain;border-radius:6px;border:1px solid #EBF2EE;" onerror="this.style.display='none'">`
+          : '<span style="color:#C2C9C5">—</span>'}
+      </td>
+      <td>
+        <div>
+          <div style="font-size:13px;font-weight:700">${b.name||''}</div>
+          <div style="font-size:10px;color:#6B7570">${b.name_en||''}</div>
+        </div>
+      </td>
+      <td>${b.country||'—'}</td>
+      <td>${cntHtml}</td>
+      <td>
+        <input type="number" value="${b.display_order != null ? b.display_order : ''}" placeholder="—"
+          style="width:52px;padding:3px 6px;border:1px solid #EBF2EE;border-radius:6px;font-size:12px;text-align:center;color:#1A1F1C"
+          title="앱 노출 순서 (숫자가 작을수록 앞에 표시)"
+          onchange="saveBrandOrder('${b.id}', this.value, this)">
+      </td>
+      <td>${check(b.has_research_team)}</td>
+      <td>${check(b.aafco_feeding_trial)}</td>
+      <td>${check(b.wsava_compliant)}</td>
+      <td>${check(b.own_factory)}</td>
+      <td>${b.recall_history ? '<span class="badge badge-red">있음</span>' : '<span class="badge badge-green">없음</span>'}</td>
+      <td>
+        <button class="btn-sm btn-outline" style="background:white;color:#4A7C59;border:1px solid #C2C9C5" onclick="openBrandDetail('${b.id}')">상세</button>
+      </td>
+    </tr>
+  `; }).join('');
+  renderPagination('brands-pagination', filteredBrands.length, brandsPage, brandsPerPage, 'gotoBrandsPage');
+}
+
+// ── 브랜드 노출 순서 인라인 저장 ─────────────────────────────
+async function saveBrandOrder(brandId, value, inputEl) {
+  const order = value === '' ? null : parseInt(value);
+  const brand = allBrands.find(b => b.id === brandId);
+  if (!brand) return;
+  const orig = inputEl.style.borderColor;
+  inputEl.style.borderColor = '#C2C9C5';
+  try {
+    const r = await fetch(`${API}/brands/${brandId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ display_order: order })
+    });
+    if (r.ok) {
+      brand.display_order = order;
+      renderBrandPreview();
+      inputEl.style.borderColor = '#4A7C59';
+      setTimeout(() => { inputEl.style.borderColor = '#EBF2EE'; }, 1000);
+    } else {
+      inputEl.style.borderColor = '#D94F3D';
+    }
+  } catch {
+    inputEl.style.borderColor = '#D94F3D';
+  }
+}
+
+// ── 삭제 공통 유틸 ───────────────────────────────────────────
+const SUPABASE_URL = 'https://ztosrxpnqvuxoyjpcfsl.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp0b3NyeHBucXZ1eG95anBjZnNsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI4MTI1ODIsImV4cCI6MjA4ODM4ODU4Mn0.Nba21n9cXz5uLMQYX8BHuWP1GkWmGjhL2ilpf9ZHbG0';
+
+async function deleteSupabaseFile(publicUrl) {
+  // publicUrl 예: https://.../storage/v1/object/public/brand-logos/filename.png
+  try {
+    const match = publicUrl.match(/\/storage\/v1\/object\/public\/(.+)/);
+    if (!match) return;
+    const path = match[1]; // "brand-logos/filename.png"
+    await fetch(`${SUPABASE_URL}/storage/v1/object/${path}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${SUPABASE_KEY}` },
+    });
+  } catch {}
+}
+
+// ── 상품 삭제 ────────────────────────────────────────────────
+function confirmDeleteFood() {
+  const name = document.getElementById('fd-name').value || '이 상품';
+  if (!confirm(`"${name}"을(를) 삭제할까요?\n\nDB와 스토리지에서 영구 삭제됩니다.`)) return;
+  deleteFood();
+}
+
+async function deleteFood() {
+  if (!currentFoodId) return;
+  try {
+    // 이미지 URL 먼저 확인
+    const r = await fetch(`${API}/foods/${currentFoodId}`);
+    if (!r.ok) { toast('상품 정보를 불러올 수 없어요', 'red'); return; }
+    const food = await r.json();
+
+    const foodId = currentFoodId;
+
+    // DB 삭제
+    const del = await fetch(`${API}/foods/${foodId}`, { method: 'DELETE' });
+    if (!del.ok && del.status !== 204) { toast('삭제 실패', 'red'); return; }
+
+    // 스토리지 이미지 삭제 (Supabase URL인 경우만)
+    if (food.image_url && food.image_url.includes(SUPABASE_URL)) {
+      await deleteSupabaseFile(food.image_url);
+    }
+
+    toast(`"${food.name}" 삭제됐어요`);
+    closeFoodDetailModal();
+    allFoods = allFoods.filter(f => f.id !== foodId);
+    filterFoods();
+    loadDashboard();
+  } catch { toast('오류 발생', 'red'); }
+}
+
+// ── 브랜드 삭제 ──────────────────────────────────────────────
+function confirmDeleteBrand() {
+  const name = document.getElementById('bd-name').value || '이 브랜드';
+  if (!confirm(`"${name}"을(를) 삭제할까요?\n\n연결된 상품 데이터는 유지되며, 브랜드 정보만 DB에서 삭제됩니다.`)) return;
+  deleteBrand();
+}
+
+async function deleteBrand() {
+  if (!currentBrandId) return;
+  try {
+    const logoUrl = document.getElementById('bd-logo-url').value.trim();
+
+    const brandId = currentBrandId;
+    const name = document.getElementById('bd-name').value;
+
+    // DB 삭제
+    const del = await fetch(`${API}/brands/${brandId}`, { method: 'DELETE' });
+    if (!del.ok && del.status !== 204) { toast('삭제 실패', 'red'); return; }
+
+    // 스토리지 로고 삭제 (Supabase URL인 경우만)
+    if (logoUrl && logoUrl.includes(SUPABASE_URL)) {
+      await deleteSupabaseFile(logoUrl);
+    }
+
+    toast(`"${name}" 삭제됐어요`);
+    closeBrandDetailModal();
+    allBrands = allBrands.filter(b => b.id !== brandId);
+    filterBrands();
+    renderBrandPreview();
+    renderBrandStats();
+    loadDashboard();
+  } catch { toast('오류 발생', 'red'); }
+}
+
+// ── 모달 외부 클릭 닫기 ───────────────────────────────────────
+document.getElementById('match-modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('match-modal')) closeModal();
+});
+
+// ── 초기화 ───────────────────────────────────────────────────
+checkApi();
+loadDashboard();
+setInterval(checkApi, 30000);
+setInterval(loadDashboard, 60000);
+</script>
+<!-- ── 상품 등록 모달 ── -->
+<div class="modal-overlay" id="food-create-modal">
+  <div class="modal" style="width:520px">
+    <div class="modal-title">상품 등록</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div>
+        <div class="modal-label">브랜드 *</div>
+        <input class="modal-input" id="fc-brand-search" placeholder="브랜드 검색..." oninput="filterBrandDropdown()" autocomplete="off">
+        <div id="fc-brand-dropdown" style="display:none;position:absolute;background:white;border:1px solid #EBF2EE;border-radius:8px;max-height:180px;overflow-y:auto;width:220px;z-index:999;box-shadow:0 4px 12px rgba(0,0,0,0.1)"></div>
+        <input type="hidden" id="fc-brand">
+      </div>
+      <div>
+        <div class="modal-label">상품명 *</div>
+        <input class="modal-input" id="fc-name" placeholder="예) 어덜트 인도어 4kg">
+      </div>
+      <div>
+        <div class="modal-label">카테고리 *</div>
+        <select class="modal-input" id="fc-category">
+          <option value="food">사료</option>
+          <option value="snack">간식</option>
+          <option value="supplement">영양제</option>
+        </select>
+      </div>
+      <div>
+        <div class="modal-label">대상 종 *</div>
+        <select class="modal-input" id="fc-species">
+          <option value="dog">강아지</option>
+          <option value="cat">고양이</option>
+          <option value="both">공통</option>
+        </select>
+      </div>
+      <div>
+        <div class="modal-label">대상 연령</div>
+        <select class="modal-input" id="fc-age">
+          <option value="all">전체</option>
+          <option value="puppy">퍼피</option>
+          <option value="adult">어덜트</option>
+          <option value="senior">시니어</option>
+        </select>
+      </div>
+      <div>
+        <div class="modal-label">바코드</div>
+        <input class="modal-input" id="fc-barcode" placeholder="8~13자리 숫자" style="font-family:'Courier New',monospace">
+      </div>
+      <div>
+        <div class="modal-label">단백질 (%)</div>
+        <input class="modal-input" id="fc-protein" type="number" placeholder="예) 32">
+      </div>
+      <div>
+        <div class="modal-label">지방 (%)</div>
+        <input class="modal-input" id="fc-fat" type="number" placeholder="예) 14">
+      </div>
+      <div>
+        <div class="modal-label">섬유질 (%)</div>
+        <input class="modal-input" id="fc-fiber" type="number" placeholder="예) 2.5">
+      </div>
+      <div>
+        <div class="modal-label">수분 (%)</div>
+        <input class="modal-input" id="fc-moisture" type="number" placeholder="예) 8">
+      </div>
+    </div>
+    <div>
+      <div class="modal-label">원재료 (등록된 원재료만 추가 가능)</div>
+      <div id="fc-ingredients-tags" style="display:flex;flex-wrap:wrap;gap:6px;min-height:36px;padding:8px;border:1px solid #EBF2EE;border-radius:10px;margin-bottom:6px;background:white"></div>
+      <div style="position:relative">
+        <input class="modal-input" id="fc-ingredients-input" placeholder="원재료 검색 후 선택..." oninput="filterIngredientDropdown()" onkeydown="handleIngredientTag(event)" autocomplete="off" style="margin-top:0">
+        <div id="fc-ingredients-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:white;border:1px solid #EBF2EE;border-radius:8px;max-height:180px;overflow-y:auto;z-index:999;box-shadow:0 4px 12px rgba(0,0,0,0.1)"></div>
+      </div>
+      <input type="hidden" id="fc-ingredients">
+    </div>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+        <input type="checkbox" id="fc-grain-free"> 그레인프리
+      </label>
+    </div>
+    <div style="margin-top:12px">
+      <div class="modal-label">상품 이미지</div>
+      <div style="display:flex;align-items:center;gap:12px;margin-top:6px">
+        <div id="fc-image-preview" style="width:72px;height:72px;border-radius:10px;border:1px solid #EBF2EE;background:#FAFAF7;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;overflow:hidden">📦</div>
+        <div style="flex:1">
+          <label style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:#EBF2EE;border-radius:8px;font-size:12px;font-weight:700;color:#4A7C59">
+            <input type="file" accept="image/*" style="display:none" onchange="handleFoodImageSelect(this)">
+            📁 파일 선택
+          </label>
+          <span id="fc-image-status" style="font-size:11px;color:#6B7570;margin-left:8px"></span>
+          <input type="hidden" id="fc-image-url">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeFoodCreateModal()">취소</button>
+      <button class="btn btn-green" onclick="saveFoodCreate()">등록</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── 상품 상세 모달 ── -->
+<div class="modal-overlay" id="food-detail-modal">
+  <div class="modal" style="width:560px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div class="modal-title" style="margin:0" id="fd-title">상품 상세</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-outline" id="fd-edit-btn" onclick="toggleFoodEdit()">편집</button>
+        <button class="btn btn-outline" style="color:#D94F3D;border-color:#D94F3D" onclick="confirmDeleteFood()">삭제</button>
+        <button class="btn btn-outline" onclick="closeFoodDetailModal()">닫기</button>
+      </div>
+    </div>
+
+    <!-- 상품 이미지 -->
+    <div style="text-align:center;margin-bottom:16px">
+      <img id="fd-image" src="" style="height:120px;object-fit:contain;border-radius:12px;background:#EBF2EE;display:none">
+      <div id="fd-image-placeholder" style="height:80px;display:flex;align-items:center;justify-content:center;font-size:48px">📦</div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div>
+        <div class="modal-label">브랜드</div>
+        <input class="modal-input" id="fd-brand" readonly>
+      </div>
+      <div>
+        <div class="modal-label">상품명</div>
+        <input class="modal-input" id="fd-name" readonly>
+      </div>
+      <div>
+        <div class="modal-label">카테고리</div>
+        <input class="modal-input" id="fd-category" readonly>
+      </div>
+      <div>
+        <div class="modal-label">대상 종</div>
+        <input class="modal-input" id="fd-species" readonly>
+      </div>
+      <div>
+        <div class="modal-label">바코드</div>
+        <input class="modal-input" id="fd-barcode" readonly style="font-family:'Courier New',monospace">
+      </div>
+      <div>
+        <div class="modal-label">그레인프리</div>
+        <input class="modal-input" id="fd-grain-free" readonly>
+      </div>
+      <div>
+        <div class="modal-label">단백질</div>
+        <input class="modal-input" id="fd-protein" readonly>
+      </div>
+      <div>
+        <div class="modal-label">지방</div>
+        <input class="modal-input" id="fd-fat" readonly>
+      </div>
+      <div>
+        <div class="modal-label">섬유질</div>
+        <input class="modal-input" id="fd-fiber" readonly>
+      </div>
+      <div>
+        <div class="modal-label">수분</div>
+        <input class="modal-input" id="fd-moisture" readonly>
+      </div>
+    </div>
+    <div>
+      <div class="modal-label">원재료</div>
+      <textarea class="modal-input" id="fd-ingredients" rows="3" readonly style="resize:vertical"></textarea>
+    </div>
+    <div class="modal-footer" id="fd-save-footer" style="display:none">
+      <button class="btn btn-outline" onclick="cancelFoodEdit()">취소</button>
+      <button class="btn btn-green" onclick="saveFoodEdit()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── 브랜드 등록 모달 ── -->
+<div class="modal-overlay" id="brand-create-modal">
+  <div class="modal" style="width:500px">
+    <div class="modal-title">브랜드 등록</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div>
+        <div class="modal-label">브랜드명 (한국어) *</div>
+        <input class="modal-input" id="bc-name" placeholder="예) 로얄캐닌">
+      </div>
+      <div>
+        <div class="modal-label">브랜드명 (영어)</div>
+        <input class="modal-input" id="bc-name-en" placeholder="예) Royal Canin">
+      </div>
+      <div>
+        <div class="modal-label">국가</div>
+        <select class="modal-input" id="bc-country">
+          <option value="">선택</option>
+          <option value="한국">한국</option>
+          <option value="미국">미국</option>
+          <option value="프랑스">프랑스</option>
+          <option value="이탈리아">이탈리아</option>
+          <option value="독일">독일</option>
+          <option value="영국">영국</option>
+          <option value="호주">호주</option>
+          <option value="캐나다">캐나다</option>
+        </select>
+      </div>
+      <div>
+        <div class="modal-label">설립연도</div>
+        <input class="modal-input" id="bc-year" type="number" placeholder="예) 1968">
+      </div>
+      <div>
+        <div class="modal-label">모회사</div>
+        <input class="modal-input" id="bc-parent" placeholder="예) Mars Inc.">
+      </div>
+      <div>
+        <div class="modal-label">브랜드 유형</div>
+        <select class="modal-input" id="bc-type">
+          <option value="">선택</option>
+          <option value="premium">프리미엄</option>
+          <option value="standard">스탠다드</option>
+          <option value="budget">가성비</option>
+          <option value="prescription">처방식</option>
+        </select>
+      </div>
+    </div>
+    <div>
+      <div class="modal-label">브랜드 설명</div>
+      <textarea class="modal-input" id="bc-desc" rows="2" placeholder="브랜드 소개..." style="resize:vertical"></textarea>
+    </div>
+    <div class="modal-label" style="margin-top:12px">신뢰 지표</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px">
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" id="bc-research"> 수의영양학 연구팀</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" id="bc-feeding"> AAFCO Feeding Trial</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" id="bc-nutrient"> AAFCO Nutrient Profile</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" id="bc-wsava"> WSAVA</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" id="bc-factory"> 자체 공장</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" id="bc-recall"> 리콜 이력 있음</label>
+    </div>
+    <div>
+      <div class="modal-label">리콜 메모</div>
+      <input class="modal-input" id="bc-recall-note" placeholder="리콜 이력 상세 내용 (선택)">
+    </div>
+    <div style="margin-top:12px">
+      <div class="modal-label">브랜드 로고</div>
+      <div style="display:flex;align-items:center;gap:12px;margin-top:6px">
+        <div id="bc-image-preview" style="width:72px;height:72px;border-radius:10px;border:1px solid #EBF2EE;background:#FAFAF7;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;overflow:hidden">🏷️</div>
+        <div style="flex:1">
+          <label style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:#EBF2EE;border-radius:8px;font-size:12px;font-weight:700;color:#4A7C59">
+            <input type="file" accept="image/*" style="display:none" onchange="handleBrandImageSelect(this)">
+            📁 파일 선택
+          </label>
+          <span id="bc-image-status" style="font-size:11px;color:#6B7570;margin-left:8px"></span>
+          <input type="hidden" id="bc-logo-url">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeBrandCreateModal()">취소</button>
+      <button class="btn btn-green" onclick="saveBrandCreate()">등록</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── 브랜드 상세 모달 ── -->
+<div class="modal-overlay" id="brand-detail-modal">
+  <div class="modal" style="width:500px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div class="modal-title" style="margin:0" id="bd-title">브랜드 상세</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-outline" id="bd-edit-btn" onclick="toggleBrandEdit()">편집</button>
+        <button class="btn btn-outline" style="color:#D94F3D;border-color:#D94F3D" onclick="confirmDeleteBrand()">삭제</button>
+        <button class="btn btn-outline" onclick="closeBrandDetailModal()">닫기</button>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div>
+        <div class="modal-label">브랜드명 (한국어)</div>
+        <input class="modal-input" id="bd-name" readonly>
+      </div>
+      <div>
+        <div class="modal-label">브랜드명 (영어)</div>
+        <input class="modal-input" id="bd-name-en" readonly>
+      </div>
+      <div>
+        <div class="modal-label">국가</div>
+        <input class="modal-input" id="bd-country" readonly>
+      </div>
+      <div>
+        <div class="modal-label">설립연도</div>
+        <input class="modal-input" id="bd-year" readonly>
+      </div>
+      <div>
+        <div class="modal-label">모회사</div>
+        <input class="modal-input" id="bd-parent" readonly>
+      </div>
+      <div>
+        <div class="modal-label">유형</div>
+        <input class="modal-input" id="bd-type" readonly>
+      </div>
+    </div>
+    <div>
+      <div class="modal-label">설명</div>
+      <textarea class="modal-input" id="bd-desc" rows="2" readonly style="resize:vertical"></textarea>
+    </div>
+    <div class="modal-label" style="margin-top:12px">신뢰 지표</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px">
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" id="bd-research" disabled> 수의영양학 연구팀</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" id="bd-feeding" disabled> AAFCO Feeding Trial</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" id="bd-nutrient" disabled> AAFCO Nutrient Profile</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" id="bd-wsava" disabled> WSAVA</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" id="bd-factory" disabled> 자체 공장</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" id="bd-recall" disabled> 리콜 이력 있음</label>
+    </div>
+    <div>
+      <div class="modal-label">리콜 메모</div>
+      <input class="modal-input" id="bd-recall-note" readonly>
+    </div>
+    <div style="margin-top:4px">
+      <div class="modal-label">로고 이미지</div>
+      <div style="display:flex;gap:10px;align-items:center;margin-top:6px">
+        <img id="bd-logo-preview" style="width:56px;height:56px;object-fit:contain;border-radius:8px;border:1px solid #EBF2EE;display:none;background:#FAFAF7" onerror="this.style.display='none'">
+        <div style="flex:1">
+          <input class="modal-input" id="bd-logo-url" readonly placeholder="이미지를 업로드하거나 URL을 직접 입력" oninput="updateLogoPreview()" style="margin-bottom:6px">
+          <div style="display:flex;gap:8px">
+            <label style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:#EBF2EE;border-radius:8px;font-size:12px;font-weight:700;color:#4A7C59">
+              <input type="file" accept="image/*" style="display:none" onchange="uploadBrandLogo(this)">
+              📁 파일 업로드
+            </label>
+            <span id="bd-logo-upload-status" style="font-size:11px;color:#6B7570;align-self:center"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:4px">
+      <div class="modal-label">노출 순서</div>
+      <input class="modal-input" id="bd-display-order" readonly type="number" placeholder="1, 2, 3 ... (비우면 맨 뒤)" style="width:200px">
+    </div>
+    <div class="modal-footer" id="bd-save-footer" style="display:none">
+      <button class="btn btn-outline" onclick="cancelBrandEdit()">취소</button>
+      <button class="btn btn-green" onclick="saveBrandEdit()">저장</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── 기존 변수/함수들은 유지 ──
+// 현재 편집 중인 상품/브랜드 ID
+let currentFoodId = null;
+let currentBrandId = null;
+let foodEditMode = false;
+let brandEditMode = false;
+
+// ── 상품 등록 ─────────────────────────────────────────────────
+function openFoodCreateModal() {
+  ['fc-brand','fc-name','fc-barcode','fc-protein','fc-fat','fc-fiber','fc-moisture','fc-ingredients'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  document.getElementById('fc-category').value = 'food';
+  document.getElementById('fc-species').value = 'dog';
+  document.getElementById('fc-age').value = 'all';
+  document.getElementById('fc-grain-free').checked = false;
+  document.getElementById('fc-image-url').value = '';
+  document.getElementById('fc-image-status').textContent = '';
+  const prev = document.getElementById('fc-image-preview');
+  prev.innerHTML = '📦'; prev.style.background = '#FAFAF7';
+  document.getElementById('food-create-modal').classList.add('open');
+}
+function closeFoodCreateModal() {
+  document.getElementById('food-create-modal').classList.remove('open');
+}
+async function saveFoodCreate() {
+  // 브랜드는 반드시 드롭다운에서 선택된 값(hidden input)이어야 함
+  const brand = document.getElementById('fc-brand').value.trim();
+  if (!brand) {
+    toast('브랜드를 목록에서 선택해주세요. 직접 입력은 불가해요', 'red');
+    document.getElementById('fc-brand-search').focus();
+    return;
+  }
+  const name = document.getElementById('fc-name').value.trim();
+  if (!name) { toast('상품명은 필수예요', 'red'); return; }
+  const body = {
+    brand, name,
+    category: document.getElementById('fc-category').value,
+    target_species: document.getElementById('fc-species').value,
+    target_age: document.getElementById('fc-age').value,
+    barcode: document.getElementById('fc-barcode').value.trim() || null,
+    protein: parseFloat(document.getElementById('fc-protein').value) || null,
+    fat: parseFloat(document.getElementById('fc-fat').value) || null,
+    fiber: parseFloat(document.getElementById('fc-fiber').value) || null,
+    moisture: parseFloat(document.getElementById('fc-moisture').value) || null,
+    ingredients: document.getElementById('fc-ingredients').value.trim() || null,
+    is_grain_free: document.getElementById('fc-grain-free').checked,
+    image_url: document.getElementById('fc-image-url').value || null,
+    source: 'manual',
+  };
+  try {
+    const r = await fetch(`${API}/foods`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    if (r.ok) {
+      toast('상품이 등록됐어요 ✓');
+      closeFoodCreateModal();
+      loadFoods(); loadDashboard();
+    } else {
+      const err = await r.json();
+      toast(err.detail || '등록 실패', 'red');
+    }
+  } catch { toast('오류 발생', 'red'); }
+}
+
+// ── 상품 상세 ─────────────────────────────────────────────────
+async function openFoodDetail(foodId) {
+  currentFoodId = foodId;
+  foodEditMode = false;
+  try {
+    const r = await fetch(`${API}/foods/${foodId}`);
+    if (!r.ok) return;
+    const f = await r.json();
+    document.getElementById('fd-title').textContent = f.name?.slice(0,30) || '상품 상세';
+    document.getElementById('fd-brand').value = f.brand || '';
+    document.getElementById('fd-name').value = f.name || '';
+    document.getElementById('fd-category').value = f.category === 'food' ? '사료' : f.category === 'snack' ? '간식' : f.category;
+    document.getElementById('fd-species').value = f.target_species === 'dog' ? '강아지' : f.target_species === 'cat' ? '고양이' : '공통';
+    document.getElementById('fd-barcode').value = f.barcode || '';
+    document.getElementById('fd-grain-free').value = f.is_grain_free ? '✓ 그레인프리' : '–';
+    document.getElementById('fd-protein').value = f.protein != null ? f.protein + '%' : '';
+    document.getElementById('fd-fat').value = f.fat != null ? f.fat + '%' : '';
+    document.getElementById('fd-fiber').value = f.fiber != null ? f.fiber + '%' : '';
+    document.getElementById('fd-moisture').value = f.moisture != null ? f.moisture + '%' : '';
+    document.getElementById('fd-ingredients').value = f.ingredients || '';
+    // 이미지
+    const img = document.getElementById('fd-image');
+    const placeholder = document.getElementById('fd-image-placeholder');
+    if (f.image_url) {
+      img.src = f.image_url; img.style.display = 'block';
+      placeholder.style.display = 'none';
+    } else {
+      img.style.display = 'none';
+      placeholder.style.display = 'flex';
+      placeholder.textContent = f.category === 'snack' ? '🦴' : '📦';
+    }
+    // 편집 버튼 초기화
+    setFoodReadonly(true);
+    document.getElementById('fd-save-footer').style.display = 'none';
+    document.getElementById('fd-edit-btn').textContent = '편집';
+    document.getElementById('food-detail-modal').classList.add('open');
+  } catch { toast('상품 정보를 불러올 수 없어요', 'red'); }
+}
+function closeFoodDetailModal() {
+  document.getElementById('food-detail-modal').classList.remove('open');
+  currentFoodId = null;
+}
+function setFoodReadonly(readonly) {
+  ['fd-brand','fd-name','fd-barcode','fd-protein','fd-fat','fd-fiber','fd-moisture','fd-ingredients'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.readOnly = readonly;
+  });
+}
+function toggleFoodEdit() {
+  foodEditMode = !foodEditMode;
+  setFoodReadonly(!foodEditMode);
+  document.getElementById('fd-edit-btn').textContent = foodEditMode ? '취소' : '편집';
+  document.getElementById('fd-save-footer').style.display = foodEditMode ? 'flex' : 'none';
+  if (!foodEditMode) openFoodDetail(currentFoodId);
+}
+function cancelFoodEdit() { toggleFoodEdit(); }
+async function saveFoodEdit() {
+  if (!currentFoodId) return;
+  const protein = document.getElementById('fd-protein').value.replace('%','').trim();
+  const fat = document.getElementById('fd-fat').value.replace('%','').trim();
+  const fiber = document.getElementById('fd-fiber').value.replace('%','').trim();
+  const moisture = document.getElementById('fd-moisture').value.replace('%','').trim();
+  const body = {
+    brand: document.getElementById('fd-brand').value.trim(),
+    name: document.getElementById('fd-name').value.trim(),
+    barcode: document.getElementById('fd-barcode').value.trim() || null,
+    protein: parseFloat(protein) || null,
+    fat: parseFloat(fat) || null,
+    fiber: parseFloat(fiber) || null,
+    moisture: parseFloat(moisture) || null,
+    ingredients: document.getElementById('fd-ingredients').value.trim() || null,
+  };
+  try {
+    const r = await fetch(`${API}/foods/${currentFoodId}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    if (r.ok) {
+      toast('저장됐어요 ✓');
+      closeFoodDetailModal();
+      loadFoods(); loadDashboard();
+    } else toast('저장 실패', 'red');
+  } catch { toast('오류 발생', 'red'); }
+}
+
+// ── 브랜드 등록 ───────────────────────────────────────────────
+function openBrandCreateModal() {
+  ['bc-name','bc-name-en','bc-year','bc-parent','bc-desc','bc-recall-note'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  ['bc-research','bc-feeding','bc-nutrient','bc-wsava','bc-factory','bc-recall'].forEach(id => {
+    document.getElementById(id).checked = false;
+  });
+  document.getElementById('bc-country').value = '';
+  document.getElementById('bc-type').value = '';
+  document.getElementById('bc-logo-url').value = '';
+  document.getElementById('bc-image-status').textContent = '';
+  const prev = document.getElementById('bc-image-preview');
+  prev.innerHTML = '🏷️'; prev.style.background = '#FAFAF7';
+  document.getElementById('brand-create-modal').classList.add('open');
+}
+function closeBrandCreateModal() {
+  document.getElementById('brand-create-modal').classList.remove('open');
+}
+async function saveBrandCreate() {
+  const name = document.getElementById('bc-name').value.trim();
+  if (!name) { toast('브랜드명은 필수예요', 'red'); return; }
+  const body = {
+    name,
+    name_en: document.getElementById('bc-name-en').value.trim() || null,
+    country: document.getElementById('bc-country').value || null,
+    founded_year: parseInt(document.getElementById('bc-year').value) || null,
+    parent_company: document.getElementById('bc-parent').value.trim() || null,
+    description: document.getElementById('bc-desc').value.trim() || null,
+    brand_type: document.getElementById('bc-type').value || null,
+    has_research_team: document.getElementById('bc-research').checked,
+    aafco_feeding_trial: document.getElementById('bc-feeding').checked,
+    aafco_nutrient_profile: document.getElementById('bc-nutrient').checked,
+    wsava_compliant: document.getElementById('bc-wsava').checked,
+    own_factory: document.getElementById('bc-factory').checked,
+    recall_history: document.getElementById('bc-recall').checked,
+    recall_note: document.getElementById('bc-recall-note').value.trim() || null,
+    logo_url: document.getElementById('bc-logo-url').value || null,
+  };
+  try {
+    const r = await fetch(`${API}/brands`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    if (r.ok) {
+      toast('브랜드가 등록됐어요 ✓');
+      closeBrandCreateModal();
+      loadBrands();
+    } else {
+      const err = await r.json();
+      toast(err.detail || '등록 실패', 'red');
+    }
+  } catch { toast('오류 발생', 'red'); }
+}
+
+// ── 브랜드 상세 ───────────────────────────────────────────────
+async function openBrandDetail(brandId) {
+  currentBrandId = brandId;
+  brandEditMode = false;
+  try {
+    const r = await fetch(`${API}/brands`);
+    if (!r.ok) return;
+    const brands = await r.json();
+    const b = brands.find(x => x.id === brandId);
+    if (!b) return;
+    document.getElementById('bd-title').textContent = b.name || '브랜드 상세';
+    document.getElementById('bd-name').value = b.name || '';
+    document.getElementById('bd-name-en').value = b.name_en || '';
+    document.getElementById('bd-country').value = b.country || '';
+    document.getElementById('bd-year').value = b.founded_year || '';
+    document.getElementById('bd-parent').value = b.parent_company || '';
+    document.getElementById('bd-type').value = b.brand_type || '';
+    document.getElementById('bd-desc').value = b.description || '';
+    document.getElementById('bd-research').checked = !!b.has_research_team;
+    document.getElementById('bd-feeding').checked = !!b.aafco_feeding_trial;
+    document.getElementById('bd-nutrient').checked = !!b.aafco_nutrient_profile;
+    document.getElementById('bd-wsava').checked = !!b.wsava_compliant;
+    document.getElementById('bd-factory').checked = !!b.own_factory;
+    document.getElementById('bd-recall').checked = !!b.recall_history;
+    document.getElementById('bd-recall-note').value = b.recall_note || '';
+    document.getElementById('bd-logo-url').value = b.logo_url || '';
+    document.getElementById('bd-display-order').value = b.display_order != null ? b.display_order : '';
+    updateLogoPreview();
+    setBrandReadonly(true);
+    document.getElementById('bd-save-footer').style.display = 'none';
+    document.getElementById('bd-edit-btn').textContent = '편집';
+    document.getElementById('brand-detail-modal').classList.add('open');
+  } catch { toast('브랜드 정보를 불러올 수 없어요', 'red'); }
+}
+function closeBrandDetailModal() {
+  document.getElementById('brand-detail-modal').classList.remove('open');
+  currentBrandId = null;
+}
+function setBrandReadonly(readonly) {
+  ['bd-name','bd-name-en','bd-country','bd-year','bd-parent','bd-type','bd-desc','bd-recall-note','bd-logo-url','bd-display-order'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.readOnly = readonly;
+  });
+  ['bd-research','bd-feeding','bd-nutrient','bd-wsava','bd-factory','bd-recall'].forEach(id => {
+    document.getElementById(id).disabled = readonly;
+  });
+}
+function updateLogoPreview() {
+  const url = document.getElementById('bd-logo-url').value.trim();
+  const img = document.getElementById('bd-logo-preview');
+  if (url) { img.src = url; img.style.display = 'block'; }
+  else { img.style.display = 'none'; }
+}
+
+async function uploadBrandLogo(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const status = document.getElementById('bd-logo-upload-status');
+  status.textContent = '업로드 중...';
+  status.style.color = '#6B7570';
+
+  const bucket = 'brand-logos';
+  const ext = file.name.split('.').pop();
+  const fileName = `brand_${Date.now()}.${ext}`;
+
+  try {
+    const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${bucket}/${fileName}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': file.type,
+        'x-upsert': 'true',
+      },
+      body: file,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || res.statusText);
+    }
+    const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/${bucket}/${fileName}`;
+    document.getElementById('bd-logo-url').value = publicUrl;
+    updateLogoPreview();
+    status.textContent = '✓ 업로드 완료';
+    status.style.color = '#4A7C59';
+  } catch(e) {
+    status.textContent = '✗ 실패: ' + e.message;
+    status.style.color = '#D94F3D';
+  }
+  input.value = '';
+}
+// ── R2 이미지 업로드 공통 ─────────────────────────────────────
+async function uploadImageToR2(file, type) {
+  const formData = new FormData();
+  formData.append('file', file);
+  const r = await fetch(`${API}/upload/image?type=${type}`, {
+    method: 'POST',
+    body: formData,
+  });
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({}));
+    throw new Error(err.detail || '업로드 실패');
+  }
+  const data = await r.json();
+  return data.url;
+}
+
+async function handleFoodImageSelect(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const status = document.getElementById('fc-image-status');
+  const preview = document.getElementById('fc-image-preview');
+  status.textContent = '업로드 중...';
+  status.style.color = '#6B7570';
+  try {
+    const url = await uploadImageToR2(file, 'food');
+    document.getElementById('fc-image-url').value = url;
+    preview.innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:cover">`;
+    status.textContent = '✓ 업로드 완료';
+    status.style.color = '#4A7C59';
+  } catch(e) {
+    status.textContent = '✗ ' + e.message;
+    status.style.color = '#D94F3D';
+  }
+  input.value = '';
+}
+
+async function handleBrandImageSelect(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const status = document.getElementById('bc-image-status');
+  const preview = document.getElementById('bc-image-preview');
+  status.textContent = '업로드 중...';
+  status.style.color = '#6B7570';
+  try {
+    const url = await uploadImageToR2(file, 'brand');
+    document.getElementById('bc-logo-url').value = url;
+    preview.innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:contain;padding:4px">`;
+    status.textContent = '✓ 업로드 완료';
+    status.style.color = '#4A7C59';
+  } catch(e) {
+    status.textContent = '✗ ' + e.message;
+    status.style.color = '#D94F3D';
+  }
+  input.value = '';
+}
+
+function toggleBrandEdit() {
+  brandEditMode = !brandEditMode;
+  setBrandReadonly(!brandEditMode);
+  document.getElementById('bd-edit-btn').textContent = brandEditMode ? '취소' : '편집';
+  document.getElementById('bd-save-footer').style.display = brandEditMode ? 'flex' : 'none';
+  if (!brandEditMode) openBrandDetail(currentBrandId);
+}
+function cancelBrandEdit() { toggleBrandEdit(); }
+async function saveBrandEdit() {
+  if (!currentBrandId) return;
+  const body = {
+    name: document.getElementById('bd-name').value.trim(),
+    name_en: document.getElementById('bd-name-en').value.trim() || null,
+    country: document.getElementById('bd-country').value.trim() || null,
+    founded_year: parseInt(document.getElementById('bd-year').value) || null,
+    parent_company: document.getElementById('bd-parent').value.trim() || null,
+    brand_type: document.getElementById('bd-type').value.trim() || null,
+    description: document.getElementById('bd-desc').value.trim() || null,
+    has_research_team: document.getElementById('bd-research').checked,
+    aafco_feeding_trial: document.getElementById('bd-feeding').checked,
+    aafco_nutrient_profile: document.getElementById('bd-nutrient').checked,
+    wsava_compliant: document.getElementById('bd-wsava').checked,
+    own_factory: document.getElementById('bd-factory').checked,
+    recall_history: document.getElementById('bd-recall').checked,
+    recall_note: document.getElementById('bd-recall-note').value.trim() || null,
+    logo_url: document.getElementById('bd-logo-url').value.trim() || null,
+    display_order: parseInt(document.getElementById('bd-display-order').value) || null,
+  };
+  try {
+    const r = await fetch(`${API}/brands/${currentBrandId}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    if (r.ok) {
+      const updated = await r.json();
+      // allBrands 캐시 즉시 갱신
+      const idx = allBrands.findIndex(b => b.id === currentBrandId);
+      if (idx !== -1) allBrands[idx] = updated;
+      toast('저장됐어요 ✓');
+      closeBrandDetailModal();
+      filterBrands();
+      renderBrandPreview();
+      renderBrandStats();
+    } else {
+      const err = await r.json().catch(() => ({}));
+      toast(err.detail || '저장 실패', 'red');
+    }
+  } catch { toast('오류 발생', 'red'); }
+}
+
+// ── 원재료 태그 입력 (등록된 원재료만 허용) ──────────────────
+let ingredientTags = [];
+
+function filterIngredientDropdown() {
+  const q = document.getElementById('fc-ingredients-input').value.trim().toLowerCase();
+  const dropdown = document.getElementById('fc-ingredients-dropdown');
+  if (!q) { dropdown.style.display = 'none'; return; }
+
+  const filtered = allIngredients.filter(i =>
+    ((i.name||'').toLowerCase().includes(q) || (i.name_en||'').toLowerCase().includes(q))
+    && !ingredientTags.includes(i.name)
+  );
+
+  if (!filtered.length) {
+    dropdown.style.display = 'block';
+    dropdown.innerHTML = `<div style="padding:12px;font-size:12px;color:#C2C9C5;text-align:center">등록된 원재료가 없어요. 원재료 관리에서 먼저 등록해주세요.</div>`;
+    return;
+  }
+  dropdown.style.display = 'block';
+  dropdown.innerHTML = filtered.slice(0, 10).map(i => `
+    <div onclick="selectIngredient('${i.name}')"
+      style="padding:10px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #F5F5F3;display:flex;align-items:center;gap:8px"
+      onmouseover="this.style.background='#EBF2EE'" onmouseout="this.style.background='white'">
+      <div style="flex:1">
+        <div style="font-weight:700">${i.name}</div>
+        ${i.name_en ? `<div style="font-size:10px;color:#6B7570">${i.name_en}</div>` : ''}
+      </div>
+      ${i.grade ? `<span class="badge ${GRADE_COLOR[i.grade]||'badge-gray'}" style="font-size:10px">${i.grade}</span>` : ''}
+      ${i.is_harmful ? `<span class="badge badge-red" style="font-size:10px">⚠</span>` : ''}
+    </div>
+  `).join('');
+}
+
+function selectIngredient(name) {
+  if (ingredientTags.includes(name)) return;
+  ingredientTags.push(name);
+  document.getElementById('fc-ingredients-input').value = '';
+  document.getElementById('fc-ingredients-dropdown').style.display = 'none';
+  renderIngredientTags();
+}
+
+function handleIngredientTag(e) {
+  // 엔터 시 드롭다운 첫 번째 항목 자동 선택
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    const dropdown = document.getElementById('fc-ingredients-dropdown');
+    const firstItem = dropdown.querySelector('div[onclick]');
+    if (firstItem) firstItem.click();
+  }
+  if (e.key === 'Escape') {
+    document.getElementById('fc-ingredients-dropdown').style.display = 'none';
+  }
+}
+
+function removeIngredientTag(val) {
+  ingredientTags = ingredientTags.filter(t => t !== val);
+  renderIngredientTags();
+}
+
+function renderIngredientTags() {
+  const container = document.getElementById('fc-ingredients-tags');
+  if (!ingredientTags.length) {
+    container.innerHTML = '<span style="font-size:11px;color:#C2C9C5;padding:4px">원재료를 검색해서 선택하세요</span>';
+    document.getElementById('fc-ingredients').value = '';
+    return;
+  }
+  container.innerHTML = ingredientTags.map(t => {
+    const ing = allIngredients.find(i => i.name === t);
+    const gradeClass = ing?.grade ? (GRADE_COLOR[ing.grade]||'badge-gray') : 'badge-gray';
+    return `
+      <span style="display:inline-flex;align-items:center;gap:4px;background:#EBF2EE;color:#4A7C59;padding:3px 10px;border-radius:99px;font-size:12px;font-weight:600">
+        ${t}
+        ${ing?.grade ? `<span class="badge ${gradeClass}" style="font-size:9px;padding:1px 5px">${ing.grade}</span>` : ''}
+        <span onclick="removeIngredientTag('${t}')" style="cursor:pointer;opacity:0.5;font-size:14px;line-height:1;margin-left:2px">×</span>
+      </span>
+    `;
+  }).join('');
+  document.getElementById('fc-ingredients').value = ingredientTags.join(', ');
+}
+
+// 원재료 드롭다운 외부 클릭 닫기
+document.addEventListener('click', e => {
+  if (!e.target.closest('#fc-ingredients-input') && !e.target.closest('#fc-ingredients-dropdown')) {
+    const dd = document.getElementById('fc-ingredients-dropdown');
+    if (dd) dd.style.display = 'none';
+  }
+});
+
+// ── 브랜드 드롭다운 (상품 등록) ───────────────────────────────
+function filterBrandDropdown() {
+  const q = document.getElementById('fc-brand-search').value.toLowerCase();
+  const dropdown = document.getElementById('fc-brand-dropdown');
+  // 검색어 바뀌면 hidden 값 초기화 (드롭다운에서 선택해야만 유효)
+  document.getElementById('fc-brand').value = '';
+
+  if (!q) { dropdown.style.display = 'none'; return; }
+  const filtered = allBrands.filter(b =>
+    (b.name||'').toLowerCase().includes(q) || (b.name_en||'').toLowerCase().includes(q)
+  );
+  if (!filtered.length) {
+    dropdown.style.display = 'block';
+    dropdown.innerHTML = `<div style="padding:12px;font-size:12px;color:#C2C9C5;text-align:center">등록된 브랜드가 없어요. 브랜드 관리에서 먼저 등록해주세요.</div>`;
+    return;
+  }
+  dropdown.style.display = 'block';
+  dropdown.innerHTML = filtered.slice(0,10).map(b => `
+    <div onclick="selectBrand('${b.name}')" style="padding:10px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #F5F5F3"
+      onmouseover="this.style.background='#EBF2EE'" onmouseout="this.style.background='white'">
+      <div style="font-weight:700">${b.name}</div>
+      ${b.name_en ? `<div style="font-size:10px;color:#6B7570">${b.name_en}</div>` : ''}
+    </div>
+  `).join('');
+}
+function selectBrand(name) {
+  document.getElementById('fc-brand-search').value = name;
+  document.getElementById('fc-brand').value = name;
+  document.getElementById('fc-brand-dropdown').style.display = 'none';
+}
+// 드롭다운 외부 클릭 시 닫기
+document.addEventListener('click', e => {
+  if (!e.target.closest('#fc-brand-search') && !e.target.closest('#fc-brand-dropdown')) {
+    const dd = document.getElementById('fc-brand-dropdown');
+    if (dd) dd.style.display = 'none';
+  }
+});
+
+// ── 상품 등록 openFoodCreateModal 오버라이드 (브랜드 검색 초기화) ──
+const _origOpenFoodCreateModal = openFoodCreateModal;
+openFoodCreateModal = function() {
+  _origOpenFoodCreateModal();
+  document.getElementById('fc-brand-search').value = '';
+  document.getElementById('fc-brand').value = '';
+  document.getElementById('fc-brand-dropdown').style.display = 'none';
+  // 원재료 태그 초기화
+  ingredientTags = [];
+  renderIngredientTags();
+  document.getElementById('fc-ingredients-input').value = '';
+  document.getElementById('fc-ingredients-dropdown').style.display = 'none';
+  // 원재료/브랜드 목록이 없으면 로드
+  if (allBrands.length === 0) loadBrands();
+  if (allIngredients.length === 0) loadIngredients();
+};
+
+// ── 유저 관리 ─────────────────────────────────────────────────
+let allUsers = [];
+
+async function loadUsers() {
+  try {
+    const [statsRes, usersRes] = await Promise.all([
+      fetch(`${API}/admin/users/stats`),
+      fetch(`${API}/admin/users`),
+    ]);
+    if (statsRes.ok) {
+      const s = await statsRes.json();
+      document.getElementById('u-total').textContent = (s.total_users||0).toLocaleString();
+      document.getElementById('u-active').textContent = (s.active_users||0).toLocaleString();
+      document.getElementById('u-kakao').textContent = (s.kakao_users||0).toLocaleString();
+      document.getElementById('u-pets').textContent = (s.total_pets||0).toLocaleString();
+      document.getElementById('nav-users-count').textContent = s.total_users||0;
+    }
+    if (usersRes.ok) {
+      allUsers = await usersRes.json();
+      document.getElementById('users-count').textContent = allUsers.length + '명';
+      filterUsers();
+    }
+  } catch(e) { console.error(e); }
+}
+
+function filterUsers() {
+  const q = document.getElementById('users-search').value.toLowerCase();
+  const active = document.getElementById('users-active').value;
+  const list = allUsers.filter(u => {
+    const mq = !q || (u.name||'').toLowerCase().includes(q) || (u.email||'').toLowerCase().includes(q);
+    const ma = !active || String(u.is_active) === active;
+    return mq && ma;
+  });
+  const tbody = document.getElementById('users-tbody');
+  if (!list.length) {
+    tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">📭</div><div class="empty-title">결과 없음</div></div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = list.map(u => `
+    <tr>
+      <td><div style="font-weight:700;font-size:13px">${u.name||'—'}</div></td>
+      <td style="font-size:12px;color:#6B7570">${u.email||'—'}</td>
+      <td>
+        ${u.kakao_id ? '<span class="badge badge-amber">카카오</span>' : ''}
+        ${u.apple_id ? '<span class="badge badge-gray">애플</span>' : ''}
+        ${!u.kakao_id && !u.apple_id ? '<span class="badge badge-gray">이메일</span>' : ''}
+      </td>
+      <td style="text-align:center">${u.pet_count||0}마리</td>
+      <td><span class="badge ${u.is_active ? 'badge-green' : 'badge-red'}">${u.is_active ? '활성' : '비활성'}</span></td>
+      <td style="font-size:11px;color:#C2C9C5">${u.created_at ? new Date(u.created_at).toLocaleDateString('ko-KR') : '—'}</td>
+      <td>
+        <button class="btn-sm ${u.is_active ? 'btn-red' : 'btn-green'}" onclick="toggleUserActive('${u.id}','${u.is_active}')">
+          ${u.is_active ? '비활성화' : '활성화'}
+        </button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function toggleUserActive(userId, currentActive) {
+  if (!confirm(`유저를 ${currentActive === 'true' ? '비활성화' : '활성화'} 할까요?`)) return;
+  try {
+    const r = await fetch(`${API}/admin/users/${userId}/toggle-active`, { method: 'PATCH' });
+    if (r.ok) { toast('변경됐어요 ✓'); loadUsers(); }
+    else toast('변경 실패', 'red');
+  } catch { toast('오류 발생', 'red'); }
+}
+
+// ── 반려동물 관리 ─────────────────────────────────────────────
+let allPetsAdmin = [];
+
+async function loadPetsAdmin() {
+  try {
+    const r = await fetch(`${API}/admin/pets`);
+    if (!r.ok) return;
+    allPetsAdmin = await r.json();
+    document.getElementById('pets-admin-count').textContent = allPetsAdmin.length + '마리';
+    document.getElementById('nav-pets-count').textContent = allPetsAdmin.length;
+    filterPetsAdmin();
+  } catch(e) { console.error(e); }
+}
+
+function filterPetsAdmin() {
+  const q = document.getElementById('pets-admin-search').value.toLowerCase();
+  const species = document.getElementById('pets-admin-species').value;
+  const list = allPetsAdmin.filter(p => {
+    const mq = !q || (p.name||'').toLowerCase().includes(q) || (p.breed||'').toLowerCase().includes(q)
+      || (p.owner_name||'').toLowerCase().includes(q) || (p.owner_email||'').toLowerCase().includes(q);
+    const ms = !species || p.species === species;
+    return mq && ms;
+  });
+  const tbody = document.getElementById('pets-admin-tbody');
+  if (!list.length) {
+    tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">📭</div><div class="empty-title">결과 없음</div></div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = list.map(p => `
+    <tr>
+      <td>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:20px">${p.emoji||'🐾'}</span>
+          <span style="font-weight:700;font-size:13px">${p.name||'—'}</span>
+        </div>
+      </td>
+      <td>
+        <span class="badge ${p.species==='dog'?'badge-amber':'badge-blue'}">${p.species==='dog'?'🐶 강아지':'🐱 고양이'}</span>
+        <div style="font-size:11px;color:#6B7570;margin-top:2px">${p.breed||'—'}</div>
+      </td>
+      <td style="font-size:12px">${p.age_year||0}년 ${p.age_month||0}개월</td>
+      <td style="font-size:12px">${p.weight ? p.weight+'kg' : '—'}</td>
+      <td><span class="badge ${p.neutered?'badge-green':'badge-gray'}">${p.neutered?'✓':'—'}</span></td>
+      <td>
+        <div style="font-size:12px;font-weight:600">${p.owner_name||'—'}</div>
+        <div style="font-size:10px;color:#6B7570">${p.owner_email||'—'}</div>
+      </td>
+      <td style="font-size:11px;color:#C2C9C5">${p.created_at ? new Date(p.created_at).toLocaleDateString('ko-KR') : '—'}</td>
+      <td>
+        <button class="btn-sm btn-red" onclick="deletePetAdmin('${p.id}','${p.name}')">삭제</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function deletePetAdmin(petId, petName) {
+  if (!confirm(`"${petName}" 반려동물을 삭제할까요? 되돌릴 수 없어요.`)) return;
+  try {
+    const r = await fetch(`${API}/admin/pets/${petId}`, { method: 'DELETE' });
+    if (r.ok || r.status === 204) { toast('삭제됐어요'); loadPetsAdmin(); }
+    else toast('삭제 실패', 'red');
+  } catch { toast('오류 발생', 'red'); }
+}
+
+// ── 원재료 관리 ───────────────────────────────────────────────
+let allIngredients = [];
+
+async function loadIngredients() {
+  try {
+    const r = await fetch(`${API}/admin/ingredients`);
+    if (!r.ok) return;
+    allIngredients = await r.json();
+    document.getElementById('ingredients-count').textContent = allIngredients.length + '개';
+    filterIngredients();
+  } catch(e) { console.error(e); }
+}
+
+const GRADE_COLOR = { 'S+':'badge-green','S':'badge-green','A':'badge-green','B':'badge-blue','B-':'badge-blue','C':'badge-amber','C-':'badge-amber','D':'badge-red' };
+
+function filterIngredients() {
+  const q = document.getElementById('ingredients-search').value.toLowerCase();
+  const grade = document.getElementById('ingredients-grade').value;
+  const category = document.getElementById('ingredients-category').value;
+  filteredIngredients = allIngredients.filter(i => {
+    const mq = !q || (i.name||'').toLowerCase().includes(q) || (i.name_en||'').toLowerCase().includes(q);
+    const mg = !grade || i.grade === grade;
+    const mc = !category || i.category === category;
+    return mq && mg && mc;
+  });
+  ingredientsPage = 1;
+  renderIngredientsPage();
+}
+
+function gotoIngredientsPage(p) {
+  const totalPages = Math.ceil(filteredIngredients.length / ingredientsPerPage);
+  ingredientsPage = Math.max(1, Math.min(p, totalPages));
+  renderIngredientsPage();
+}
+
+function renderIngredientsPage() {
+  const tbody = document.getElementById('ingredients-tbody');
+  if (!filteredIngredients.length) {
+    tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">🌿</div><div class="empty-title">원재료가 없어요</div><div class="empty-sub">+ 원재료 등록 버튼으로 추가해주세요</div></div></td></tr>';
+    document.getElementById('ingredients-pagination').innerHTML = '';
+    return;
+  }
+  const slice = filteredIngredients.slice((ingredientsPage - 1) * ingredientsPerPage, ingredientsPage * ingredientsPerPage);
+  tbody.innerHTML = slice.map(i => `
+    <tr>
+      <td><div style="font-weight:700;font-size:13px">${i.name||'—'}</div>${i.description ? `<div style="font-size:10px;color:#6B7570;margin-top:2px">${i.description.slice(0,30)}</div>` : ''}</td>
+      <td style="font-size:12px;color:#6B7570">${i.name_en||'—'}</td>
+      <td>${i.grade ? `<span class="badge ${GRADE_COLOR[i.grade]||'badge-gray'}">${i.grade}</span>` : '—'}</td>
+      <td>${i.category ? `<span class="badge badge-gray">${i.category}</span>` : '—'}</td>
+      <td><span class="badge ${i.is_harmful?'badge-red':'badge-green'}">${i.is_harmful?'⚠ 위험':'안전'}</span></td>
+      <td><span class="badge ${i.is_allergen?'badge-amber':'badge-gray'}">${i.is_allergen?'알레르기':'—'}</span></td>
+      <td>
+        <button class="btn-sm btn-red" onclick="deleteIngredient('${i.id}','${i.name}')">삭제</button>
+      </td>
+    </tr>
+  `).join('');
+  renderPagination('ingredients-pagination', filteredIngredients.length, ingredientsPage, ingredientsPerPage, 'gotoIngredientsPage');
+}
+
+function openIngredientCreateModal() {
+  ['ic-name','ic-name-en','ic-desc'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
+  document.getElementById('ic-grade').value = '';
+  document.getElementById('ic-category').value = '';
+  document.getElementById('ic-harmful').checked = false;
+  document.getElementById('ic-allergen').checked = false;
+  document.getElementById('ingredient-create-modal').classList.add('open');
+}
+function closeIngredientCreateModal() {
+  document.getElementById('ingredient-create-modal').classList.remove('open');
+}
+async function saveIngredientCreate() {
+  const name = document.getElementById('ic-name').value.trim();
+  if (!name) { toast('원재료명은 필수예요', 'red'); return; }
+  const body = {
+    name,
+    name_en: document.getElementById('ic-name-en').value.trim() || null,
+    grade: document.getElementById('ic-grade').value || null,
+    category: document.getElementById('ic-category').value || null,
+    description: document.getElementById('ic-desc').value.trim() || null,
+    is_harmful: document.getElementById('ic-harmful').checked,
+    is_allergen: document.getElementById('ic-allergen').checked,
+  };
+  try {
+    const r = await fetch(`${API}/admin/ingredients`, {
+      method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body)
+    });
+    if (r.ok) {
+      toast('원재료가 등록됐어요 ✓');
+      closeIngredientCreateModal();
+      loadIngredients();
+    } else {
+      const err = await r.json();
+      toast(err.detail || '등록 실패', 'red');
+    }
+  } catch { toast('오류 발생', 'red'); }
+}
+async function deleteIngredient(id, name) {
+  if (!confirm(`"${name}" 원재료를 삭제할까요?`)) return;
+  try {
+    const r = await fetch(`${API}/admin/ingredients/${id}`, { method:'DELETE' });
+    if (r.ok || r.status === 204) { toast('삭제됐어요'); loadIngredients(); }
+    else toast('삭제 실패', 'red');
+  } catch { toast('오류 발생', 'red'); }
+}
+
+// ── 원재료 모달 외부 클릭 닫기 ────────────────────────────────
+document.getElementById('ingredient-create-modal')?.addEventListener('click', e => {
+  if (e.target.id === 'ingredient-create-modal') closeIngredientCreateModal();
+});
+</script>
+
+</body>
+</html>
