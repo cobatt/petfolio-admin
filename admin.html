@@ -379,30 +379,28 @@ tr:hover td { background: #FAFAF7; }
 
     <div class="stats-grid" style="grid-template-columns:repeat(6,1fr)">
       <div class="stat-card">
-        <div class="stat-label">전체</div>
-        <div class="stat-value" id="f-total">—</div>
+        <div class="stat-label">전체 상품</div>
+        <div class="stat-value" id="fs-total">—</div>
       </div>
       <div class="stat-card" style="cursor:pointer" onclick="setFoodsMissing('no_image')" title="이미지 없음 상품만 보기">
         <div class="stat-label">이미지 없음</div>
-        <div class="stat-value red" id="f-no-image">—</div>
-      </div>
-      <div class="stat-card" style="cursor:pointer" onclick="setFoodsMissing('no_ingredients')" title="원재료 없음 상품만 보기">
-        <div class="stat-label">원재료 없음</div>
-        <div class="stat-value amber" id="f-no-ing">—</div>
+        <div class="stat-value amber" id="fs-no-image">—</div>
       </div>
       <div class="stat-card" style="cursor:pointer" onclick="setFoodsMissing('no_brand')" title="브랜드 없음 상품만 보기">
         <div class="stat-label">브랜드 없음</div>
-        <div class="stat-value red" id="f-no-brand">—</div>
+        <div class="stat-value red" id="fs-no-brand">—</div>
       </div>
-      <div class="stat-card" style="cursor:pointer" onclick="showPage('ingredients');setTimeout(()=>document.getElementById('ing-coverage-section')?.scrollIntoView({behavior:'smooth'}),200)" title="원재료 미연결 상품 → 원재료 관리">
-        <div class="stat-label">원재료 미연결</div>
-        <div class="stat-value red" id="f-no-junction">—</div>
-        <div class="stat-sub" id="f-no-junction-sub">—</div>
+      <div class="stat-card" style="cursor:pointer" onclick="setFoodsMissing('no_ingredients')" title="원재료 없음 상품만 보기">
+        <div class="stat-label">원재료 없음</div>
+        <div class="stat-value" id="fs-no-ing">—</div>
       </div>
       <div class="stat-card" style="cursor:pointer" onclick="setFoodsMissing('partial_junction')" title="원재료 부분 연결 상품만 보기">
         <div class="stat-label">원재료 부분연결</div>
-        <div class="stat-value amber" id="f-partial-junction">—</div>
-        <div class="stat-sub">일부 원재료 미정리</div>
+        <div class="stat-value amber" id="fs-partial">—</div>
+      </div>
+      <div class="stat-card" style="cursor:pointer" onclick="setFoodsMissing('no_junction')" title="원재료 미연결 상품만 보기">
+        <div class="stat-label">원재료 미연결</div>
+        <div class="stat-value red" id="fs-not-connected">—</div>
       </div>
     </div>
 
@@ -765,29 +763,6 @@ tr:hover td { background: #FAFAF7; }
           <button class="btn btn-red" id="rebuild-btn" onclick="rebuildIngredientsFromScratch()" style="font-size:11px;padding:5px 12px" title="ingredients 원본 텍스트 기준으로 원재료·연결 데이터 전체 재건 (기존 데이터 삭제)">🔄 전체 재건</button>
         </div>
       </div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px">
-        <div style="background:#FAFAF7;border-radius:10px;padding:14px 16px;border:1px solid #EBF2EE">
-          <div style="font-size:11px;color:#6B7570;font-weight:700;margin-bottom:4px">브랜드 ID 연결</div>
-          <div style="font-size:22px;font-weight:800;color:#4A7C59" id="cov-brand-linked">—</div>
-          <div style="font-size:11px;color:#6B7570" id="cov-brand-sub">로딩 중...</div>
-          <div style="margin-top:8px;height:4px;background:#EBF2EE;border-radius:2px">
-            <div id="cov-brand-bar" style="height:4px;background:#4A7C59;border-radius:2px;width:0%;transition:width 0.4s"></div>
-          </div>
-        </div>
-        <div style="background:#FAFAF7;border-radius:10px;padding:14px 16px;border:1px solid #EBF2EE">
-          <div style="font-size:11px;color:#6B7570;font-weight:700;margin-bottom:4px">원재료 ID 연결 (완전)</div>
-          <div style="font-size:22px;font-weight:800;color:#4A7C59" id="cov-ji-linked">—</div>
-          <div style="font-size:11px;color:#6B7570" id="cov-ji-sub">로딩 중...</div>
-          <div style="margin-top:8px;height:4px;background:#EBF2EE;border-radius:2px">
-            <div id="cov-ji-bar" style="height:4px;background:#4A7C59;border-radius:2px;width:0%;transition:width 0.4s"></div>
-          </div>
-        </div>
-        <div style="background:#FEF3E2;border-radius:10px;padding:14px 16px;border:1px solid #F5DFB0">
-          <div style="font-size:11px;color:#6B7570;font-weight:700;margin-bottom:4px">원재료 미연결 / 부분연결</div>
-          <div style="font-size:22px;font-weight:800;color:#E8A030" id="cov-ji-missing">—</div>
-          <div style="font-size:11px;color:#6B7570" id="cov-ji-missing-sub">로딩 중...</div>
-        </div>
-      </div>
       <!-- 미연결 상품 목록 -->
       <div id="cov-unlinked-section" style="display:none">
         <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
@@ -861,24 +836,26 @@ tr:hover td { background: #FAFAF7; }
         <button class="btn btn-green dedup-tab" onclick="switchDedupTab('space')"   data-tab="space">띄어쓰기</button>
         <button class="btn btn-outline dedup-tab" onclick="switchDedupTab('special')" data-tab="special">특수문자</button>
         <button class="btn btn-outline dedup-tab" onclick="switchDedupTab('prefix')"  data-tab="prefix">수식어(신선한·생)</button>
-        <button class="btn btn-outline dedup-tab" onclick="switchDedupTab('synonym')" data-tab="synonym">동의어(건조=말린)</button>
       </div>
       <div id="dedup-list" style="display:none">
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
+                <th style="width:32px"><input type="checkbox" id="dedup-check-all" onchange="toggleDedupCheckAll(this.checked)" title="전체 선택"></th>
                 <th style="width:50px">그룹</th>
                 <th>유지할 항목 선택</th>
                 <th>삭제될 항목</th>
-                <th style="width:80px">액션</th>
+                <th style="width:100px">액션</th>
               </tr>
             </thead>
             <tbody id="dedup-tbody"></tbody>
           </table>
         </div>
+        <div id="dedup-pagination" style="padding:8px 20px;border-top:1px solid #EBF2EE;display:flex;justify-content:center;gap:4px"></div>
         <div style="padding:12px 20px;border-top:1px solid #EBF2EE;background:#FAFAF7;display:flex;justify-content:flex-end;gap:8px">
           <button class="btn btn-outline" onclick="loadDedupList()">새로고침</button>
+          <button class="btn btn-outline" onclick="applyDedupSelected()">✅ 선택 병합</button>
           <button class="btn btn-red" onclick="applyDedupAll()">⚡ 전체 병합</button>
         </div>
       </div>
@@ -1114,6 +1091,7 @@ function showPage(name) {
   if (name === 'users') loadUsers();
   if (name === 'pets-admin') loadPetsAdmin();
   if (name === 'ingredients') { loadIngredients(); loadCoverageStats(); }
+  if (name === 'foods') { loadFoodsStats(); }
 }
 
 // ── 토스트 ────────────────────────────────────────────────────
@@ -1147,6 +1125,7 @@ async function loadDashboard() {
     ]);
     // 커버리지 통계 비동기 로드 (대시보드와 병렬)
     loadCoverageStats();
+    loadFoodsStats();
 
     if (statsRes.ok) {
       stats = await statsRes.json();
@@ -1178,11 +1157,6 @@ async function loadDashboard() {
       // 네비 뱃지
       document.getElementById('nav-foods-count').textContent = (stats.total_foods||0).toLocaleString();
       document.getElementById('nav-barcode-count').textContent = (stats.has_barcode||0) + '/' + (stats.total_foods||0);
-
-      // 상품 탭 통계
-      document.getElementById('f-total').textContent = (stats.total_foods||0).toLocaleString();
-      document.getElementById('f-no-image').textContent = (stats.no_image||0).toLocaleString();
-      document.getElementById('f-no-ing').textContent = (stats.no_ingredients||0).toLocaleString();
 
       // 바코드 탭 통계
       document.getElementById('b-total').textContent = (stats.total_foods||0).toLocaleString();
@@ -1278,8 +1252,6 @@ function filterFoods() {
   }).sort((a, b) => (foodSeqMap[b.id]||0) - (foodSeqMap[a.id]||0));
   foodsPage = 1;
   renderFoodsPage();
-  const noBrand = allFoods.filter(f => !f.brand_id).length;
-  document.getElementById('f-no-brand').textContent = noBrand.toLocaleString();
 }
 
 async function filterFoodsByJunction(type, q, cat, species, brand) {
@@ -2082,7 +2054,10 @@ setInterval(loadDashboard, 60000);
       <div id="fd-ing-edit" style="display:none">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
           <span style="font-size:11px;color:#6B7570">검색 후 선택하거나 직접 입력 후 Enter</span>
-          <span style="font-size:10px;color:#C2C9C5">⠿ 드래그로 순서 변경</span>
+          <div style="display:flex;gap:6px;align-items:center">
+            <button class="btn-sm btn-outline" onclick="reparseIngSmartSplit()" title="원재료 전체 텍스트를 괄호 밖 쉼표 기준으로 재파싱하고 등록된 원재료와 매핑">🔄 괄호 인식 재파싱</button>
+            <span style="font-size:10px;color:#C2C9C5">⠿ 드래그로 순서 변경</span>
+          </div>
         </div>
         <div id="fd-ing-tags" style="display:flex;flex-direction:column;gap:4px;margin-bottom:8px;min-height:80px;padding:4px;background:#FAFAF7;border-radius:8px;border:1px solid #EBF2EE"></div>
         <div style="position:relative">
@@ -2311,16 +2286,17 @@ function closeFoodCreateModal() {
 }
 async function saveFoodCreate() {
   // 브랜드는 반드시 드롭다운에서 선택된 값(hidden input)이어야 함
-  const brand = document.getElementById('fc-brand').value.trim();
-  if (!brand) {
+  const brandId = document.getElementById('fc-brand').value.trim();
+  if (!brandId) {
     toast('브랜드를 목록에서 선택해주세요. 직접 입력은 불가해요', 'red');
     document.getElementById('fc-brand-search').focus();
     return;
   }
+  const brand = document.getElementById('fc-brand-search').value.trim();
   const name = document.getElementById('fc-name').value.trim();
   if (!name) { toast('상품명은 필수예요', 'red'); return; }
   const body = {
-    brand, name,
+    brand_id: brandId, brand, name,
     category: document.getElementById('fc-category').value,
     target_species: document.getElementById('fc-species').value,
     target_age: document.getElementById('fc-age').value,
@@ -2362,9 +2338,8 @@ async function openFoodDetail(foodId) {
     if (!r.ok) return;
     const f = await r.json();
     document.getElementById('fd-title').textContent = f.name?.slice(0,30) || '상품 상세';
-    // 브랜드: brand_id 기준 (allBrands에서 이름 조회, 없으면 레거시 brand 문자열 사용)
-    const _fdBrandObj = allBrands.find(b => b.id === f.brand_id);
-    _currentFdBrandName = _fdBrandObj ? _fdBrandObj.name : (f.brand || '');
+    // 브랜드: 백엔드가 주입한 brand_name 우선, 없으면 레거시 brand 문자열 사용
+    _currentFdBrandName = f.brand_name ?? f.brand ?? '';
     document.getElementById('fd-brand').value = f.brand_id || '';
     document.getElementById('fd-brand-view').textContent = _currentFdBrandName || '—';
     document.getElementById('fd-name').value = f.name || '';
@@ -2378,11 +2353,8 @@ async function openFoodDetail(foodId) {
     document.getElementById('fd-moisture').value = f.moisture != null ? f.moisture + '%' : '';
     document.getElementById('fd-ingredients').value = f.ingredients || '';
     _fdMainIngredients = Array.isArray(f.main_ingredients) && f.main_ingredients.length ? f.main_ingredients : null;
-    // food_ingredients 조인 데이터 사전 로드 (편집 모드에서 사용)
-    try {
-      const fiR = await fetch(`${API}/admin/foods/${foodId}/ingredients`);
-      _fdJunctionItems = fiR.ok ? await fiR.json() : null;
-    } catch { _fdJunctionItems = null; }
+    // food_ingredients 조인 데이터: 상품 응답의 structured_ingredients 사용
+    _fdJunctionItems = f.structured_ingredients?.length ? f.structured_ingredients : null;
     renderFdIngTagsReadonly();
     // 이미지
     const img = document.getElementById('fd-image');
@@ -2468,6 +2440,65 @@ let fdIngTags = []; // [{name, pct, ingredient_id: string|null}]
 let _fdJunctionItems = null; // food_ingredients API 응답 캐시
 let _fdMainIngredients = null; // food.main_ingredients 원본 순서 캐시
 
+// 괄호 밖 쉼표만 기준으로 분리
+function splitOutsideParens(str) {
+  const result = [];
+  let depth = 0, current = '';
+  for (const ch of str) {
+    if (ch === '(') depth++;
+    else if (ch === ')') depth--;
+    else if (ch === ',' && depth === 0) {
+      if (current.trim()) result.push(current.trim());
+      current = '';
+      continue;
+    }
+    current += ch;
+  }
+  if (current.trim()) result.push(current.trim());
+  return result;
+}
+
+// 등록된 원재료 이름 정규화 매핑
+function buildIngredientNameMap() {
+  const map = new Map();
+  for (const ing of allIngredients) {
+    map.set(ing.name, ing);
+    map.set(ing.name.toLowerCase().replace(/\s+/g, ''), ing);
+  }
+  return map;
+}
+
+function matchIngredient(rawName, ingMap) {
+  if (ingMap.has(rawName)) return ingMap.get(rawName);
+  const normalized = rawName.toLowerCase().replace(/\s+/g, '');
+  if (ingMap.has(normalized)) return ingMap.get(normalized);
+  return null;
+}
+
+async function reparseIngSmartSplit() {
+  if (!allIngredients.length) await loadIngredients();
+  const raw = document.getElementById('fd-ingredients').value || '';
+  if (!raw.trim()) { toast('원재료 텍스트가 없어요', 'red'); return; }
+
+  const PCT_RE = /^(.+?)\s*\((\d+(?:\.\d+)?)%\)\s*$/;
+  const ingMap = buildIngredientNameMap();
+  const segments = splitOutsideParens(raw);
+
+  let matched = 0;
+  fdIngTags = segments.map(seg => {
+    const pctMatch = seg.match(PCT_RE);
+    const rawName = pctMatch ? pctMatch[1].trim() : seg;
+    const pct = pctMatch ? parseFloat(pctMatch[2]) : null;
+    const ing = matchIngredient(rawName, ingMap);
+    if (ing) matched++;
+    return { ingredient_id: ing ? ing.id : null, name: ing ? ing.name : rawName, pct };
+  }).filter(t => t.name);
+
+  renderFdIngTags();
+  syncFdIngValue();
+  toast(`재파싱 완료: ${segments.length}개 원재료, ${matched}개 매핑됨`);
+}
+
 function syncFdIngValue() {
   document.getElementById('fd-ingredients').value = fdIngTags
     .map(t => t.pct != null ? `${t.name}(${t.pct}%)` : t.name)
@@ -2500,12 +2531,39 @@ function initFdIngTags() {
 }
 
 function renderFdIngTagsReadonly() {
-  const raw = document.getElementById('fd-ingredients').value || '';
-  const tags = raw.split(',').map(s => s.trim()).filter(Boolean);
-  document.getElementById('fd-ing-view').innerHTML = tags.length
-    ? tags.map(t => `<span style="display:inline-block;background:#EBF2EE;padding:2px 8px;border-radius:12px;margin:2px 3px;font-size:11px">${t}</span>`).join('')
-    : '<span style="color:#C2C9C5">없음</span>';
-  document.getElementById('fd-ing-view').style.display = 'block';
+  const el = document.getElementById('fd-ing-view');
+
+  // _fdJunctionItems: 연결된 항목만 있음 (INNER JOIN 결과)
+  // _fdMainIngredients: 전체 원재료 목록 (연결 여부 무관)
+  const linkedNames = new Set((_fdJunctionItems || []).map(fi => fi.ingredient_name));
+
+  if (_fdMainIngredients && _fdMainIngredients.length > 0) {
+    let unlinkedCount = 0;
+    const html = _fdMainIngredients.map(mi => {
+      const name = typeof mi === 'string' ? mi : mi.name;
+      const pct = (typeof mi === 'object' && mi.pct != null) ? mi.pct : null;
+      const linked = linkedNames.has(name);
+      if (!linked) unlinkedCount++;
+      const bg = linked ? '#EBF2EE' : '#FEF3E2';
+      const color = linked ? '#1A1F1C' : '#B47B40';
+      const border = linked ? 'none' : '1px solid #F5C87A';
+      const tip = linked ? '원재료 DB 연결됨' : '미연결 — 원재료 DB에 없는 항목';
+      const pctHtml = pct != null ? ` <span style="color:#9CA8A1;font-size:10px">${pct}%</span>` : '';
+      return `<span title="${tip}" style="display:inline-flex;align-items:center;gap:3px;background:${bg};border:${border};color:${color};padding:2px 8px;border-radius:12px;margin:2px 3px;font-size:11px;font-weight:${linked?'400':'600'}">${name}${pctHtml}</span>`;
+    }).join('');
+    const legend = unlinkedCount
+      ? `<div style="margin-top:6px;font-size:10px;color:#B47B40">⚠ 미연결 ${unlinkedCount}개 — 수정 모드에서 괄호 인식 재파싱을 사용해보세요</div>`
+      : '';
+    el.innerHTML = html + legend;
+  } else {
+    // fallback: 원본 텍스트 파싱
+    const raw = document.getElementById('fd-ingredients').value || '';
+    const tags = splitOutsideParens(raw).filter(Boolean);
+    el.innerHTML = tags.length
+      ? tags.map(t => `<span style="display:inline-block;background:#EBF2EE;padding:2px 8px;border-radius:12px;margin:2px 3px;font-size:11px">${t}</span>`).join('')
+      : '<span style="color:#C2C9C5">없음</span>';
+  }
+  el.style.display = 'block';
   document.getElementById('fd-ing-edit').style.display = 'none';
 }
 
@@ -2957,7 +3015,7 @@ function filterIngredientDropdown() {
   }
   dropdown.style.display = 'block';
   dropdown.innerHTML = filtered.slice(0, 10).map(i => `
-    <div onclick="selectIngredient('${i.name}')"
+    <div onclick="selectIngredient('${i.id}','${i.name.replace(/'/g,"\\'")}')"
       style="padding:10px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #F5F5F3;display:flex;align-items:center;gap:8px"
       onmouseover="this.style.background='#EBF2EE'" onmouseout="this.style.background='white'">
       <div style="flex:1">
@@ -2970,10 +3028,9 @@ function filterIngredientDropdown() {
   `).join('');
 }
 
-function selectIngredient(name) {
+function selectIngredient(id, name) {
   if (ingredientTags.some(t => t.name === name)) return;
-  const ing = allIngredients.find(i => i.name === name);
-  ingredientTags.push({ name, pct: null, ingredient_id: ing?.id ?? null });
+  ingredientTags.push({ id, name, pct: null });
   document.getElementById('fc-ingredients-input').value = '';
   document.getElementById('fc-ingredients-dropdown').style.display = 'none';
   renderIngredientTags();
@@ -3061,16 +3118,16 @@ function filterBrandDropdown() {
   }
   dropdown.style.display = 'block';
   dropdown.innerHTML = filtered.slice(0,10).map(b => `
-    <div onclick="selectBrand('${b.name}')" style="padding:10px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #F5F5F3"
+    <div onclick="selectBrand('${b.id}','${b.name.replace(/'/g,"\\'")}')" style="padding:10px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #F5F5F3"
       onmouseover="this.style.background='#EBF2EE'" onmouseout="this.style.background='white'">
       <div style="font-weight:700">${b.name}</div>
       ${b.name_en ? `<div style="font-size:10px;color:#6B7570">${b.name_en}</div>` : ''}
     </div>
   `).join('');
 }
-function selectBrand(name) {
+function selectBrand(id, name) {
   document.getElementById('fc-brand-search').value = name;
-  document.getElementById('fc-brand').value = name;
+  document.getElementById('fc-brand').value = id;
   document.getElementById('fc-brand-dropdown').style.display = 'none';
 }
 // 드롭다운 외부 클릭 시 닫기
@@ -3248,39 +3305,21 @@ async function loadCoverageStats() {
 }
 
 function renderCoverageStats(s) {
-  if (!s) return;
-  const total = s.total_foods || 1;
+  // coverage stats loaded — unlinked section uses loadUnlinkedFoods() independently
+}
 
-  // 브랜드
-  const bPct = Math.round(s.linked_brand / total * 100);
-  document.getElementById('cov-brand-linked').textContent = s.linked_brand.toLocaleString();
-  document.getElementById('cov-brand-sub').textContent =
-    `전체 ${total.toLocaleString()}개 중 ${bPct}% (미연결 ${s.unlinked_brand})`;
-  document.getElementById('cov-brand-bar').style.width = bPct + '%';
-
-  // 원재료 완전연결
-  const jPct = Math.round(s.linked_ingredients / total * 100);
-  document.getElementById('cov-ji-linked').textContent = s.linked_ingredients.toLocaleString();
-  document.getElementById('cov-ji-sub').textContent =
-    `전체 ${total.toLocaleString()}개 중 ${jPct}%`;
-  document.getElementById('cov-ji-bar').style.width = jPct + '%';
-
-  // 미연결/부분연결
-  const missing = s.unlinked_ingredients;
-  const partial = s.partial_junction || 0;
-  document.getElementById('cov-ji-missing').textContent = missing.toLocaleString();
-  document.getElementById('cov-ji-missing-sub').textContent =
-    `미연결 ${missing} | 부분연결 ${partial} | 텍스트만 ${s.text_only_no_junction}`;
-
-  // 상품 탭 stat 카드
-  const fjEl = document.getElementById('f-no-junction');
-  if (fjEl) {
-    fjEl.textContent = missing.toLocaleString();
-    const sub = document.getElementById('f-no-junction-sub');
-    if (sub) sub.textContent = `부분연결 ${partial}개 포함`;
-  }
-  const pfEl = document.getElementById('f-partial-junction');
-  if (pfEl) pfEl.textContent = partial.toLocaleString();
+async function loadFoodsStats() {
+  try {
+    const r = await fetch(`${API}/admin/foods/stats`);
+    if (!r.ok) return;
+    const s = await r.json();
+    document.getElementById('fs-total').textContent = (s.total || 0).toLocaleString();
+    document.getElementById('fs-no-image').textContent = (s.no_image || 0).toLocaleString();
+    document.getElementById('fs-no-brand').textContent = (s.no_brand || 0).toLocaleString();
+    document.getElementById('fs-no-ing').textContent = (s.no_ingredients || 0).toLocaleString();
+    document.getElementById('fs-partial').textContent = (s.partially_connected || 0).toLocaleString();
+    document.getElementById('fs-not-connected').textContent = (s.not_connected || 0).toLocaleString();
+  } catch(e) { console.error('foods-stats error', e); }
 }
 
 async function loadUnlinkedFoods() {
@@ -3799,56 +3838,16 @@ async function applyCleanup(item) {
       const cachedIng = allIngredients.find(i => i.id === item.id);
       if (cachedIng) cachedIng.name = item.cleanName;
     } else {
-      const r = await fetch(`${API}/admin/ingredients/${item.id}`, { method: 'DELETE' });
-      if (!r.ok && r.status !== 204) { toast('삭제 실패', 'red'); return; }
+      // 중복 → merge endpoint로 food_ingredients 자동 재매핑 후 삭제
+      const r = await fetch(`${API}/admin/ingredients/${item.id}/merge`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ merge_into_id: item.duplicateId }),
+      });
+      if (!r.ok) { toast('삭제 실패', 'red'); return; }
     }
 
-    // STEP 2 — 영향받는 상품 main_ingredients 업데이트
-    if (item.affectedFoods.length) {
-      for (const food of item.affectedFoods) {
-        try {
-          let newList;
-          const currentList = food.main_ingredients;
-
-          if (!currentList?.length && food.ingredients) {
-            // main_ingredients가 없으면 ingredients 텍스트 전체를 파싱해서 생성
-            newList = food.ingredients.split(',').map(s => {
-              const t = s.trim();
-              if (!t) return null;
-              if (t === item.name) return { name: item.cleanName, pct: item.pct };
-              const p = parsePctName(t);
-              return p ? { name: p.cleanName, pct: p.pct } : { name: t, pct: null };
-            }).filter(Boolean);
-          } else {
-            newList = (currentList ?? []).map(x => {
-              if (typeof x === 'string') {
-                if (x === item.name) return { name: item.cleanName, pct: item.pct };
-                const p = parsePctName(x);
-                if (p && p.cleanName === item.cleanName) return { name: item.cleanName, pct: p.pct };
-                return { name: x, pct: null };
-              }
-              if (x.name === item.name) return { name: item.cleanName, pct: item.pct };
-              return x;
-            });
-          }
-
-          const oldNameRE = new RegExp(item.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
-          const patchBody = { main_ingredients: newList };
-          if (food.ingredients?.includes(item.name)) {
-            patchBody.ingredients = food.ingredients.replace(oldNameRE, item.cleanName);
-          }
-          await fetch(`${API}/foods/${food.id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(patchBody),
-          });
-          // food_ingredients 조인 테이블도 동기화
-          await syncFoodJunctionTable(food.id, newList);
-        } catch(e) { console.error('food update failed:', food.id, e); }
-      }
-    }
-
-    // STEP 3 — 완료 처리 (전체 재렌더링으로 stale index 방지)
+    // STEP 2 — 완료 처리 (food_ingredients는 자동 업데이트됨)
     // 신규 정리였다면 같은 cleanName을 가진 나머지 항목들을 병합 대상으로 전환
     if (!item.isDuplicate) {
       cleanupItems.forEach(x => {
@@ -3881,6 +3880,8 @@ async function applyCleanupAll() {
 // ── 유사 원재료 중복 정리 ────────────────────────────────────
 let dedupGroups = [];
 let dedupTabActive = 'space';
+let dedupPage = 0;
+const DEDUP_PAGE_SIZE = 20;
 
 const SYNONYM_MAP = [
   ['건조', '말린', '드라이'],
@@ -3954,6 +3955,7 @@ async function loadDedupList() {
   if (!allIngredients.length) await loadIngredients();
   const fns = { space: groupBySpace, special: groupBySpecial, prefix: groupByPrefix, synonym: groupBySynonym };
   dedupGroups = fns[dedupTabActive](allIngredients);
+  dedupPage = 0;
   document.getElementById('dedup-count').textContent = `${dedupGroups.length}개 그룹 발견`;
   document.getElementById('dedup-list').style.display = 'block';
   renderDedupList();
@@ -3962,40 +3964,97 @@ async function loadDedupList() {
 function renderDedupList() {
   const tbody = document.getElementById('dedup-tbody');
   if (!dedupGroups.length) {
-    tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state"><div class="empty-icon">✅</div><div class="empty-title">이 유형의 중복이 없어요</div></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state"><div class="empty-icon">✅</div><div class="empty-title">이 유형의 중복이 없어요</div></div></td></tr>`;
+    document.getElementById('dedup-pagination').innerHTML = '';
+    const allCheck = document.getElementById('dedup-check-all');
+    if (allCheck) allCheck.checked = false;
     return;
   }
-  tbody.innerHTML = dedupGroups.map((group, idx) => {
+  const start = dedupPage * DEDUP_PAGE_SIZE;
+  const pageGroups = dedupGroups.slice(start, start + DEDUP_PAGE_SIZE);
+  tbody.innerHTML = pageGroups.map((group, localIdx) => {
+    const realIdx = start + localIdx;
     const defaultKeep = group.reduce((a, b) => a.name.length <= b.name.length ? a : b);
     const radios = group.map(item => {
-      const safeId = item.id;
       const grade = item.grade ? `<span class="badge ${GRADE_COLOR[item.grade]||'badge-gray'}" style="font-size:9px;margin-left:3px">${item.grade}</span>` : '';
       return `<label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;padding:2px 0">
-        <input type="radio" name="dedup-keep-${idx}" value="${safeId}" ${item.id === defaultKeep.id ? 'checked' : ''} onchange="updateDedupDeleteCol(${idx})">
+        <input type="radio" name="dedup-keep-${realIdx}" value="${item.id}" ${item.id === defaultKeep.id ? 'checked' : ''} onchange="updateDedupDeleteCol(${realIdx})">
         <span>${item.name}</span>${grade}
       </label>`;
     }).join('');
     const deletedNames = group.filter(i => i.id !== defaultKeep.id).map(i => i.name).join(', ');
-    return `<tr id="dedup-row-${idx}">
+    return `<tr id="dedup-row-${realIdx}">
+      <td><input type="checkbox" class="dedup-check" data-idx="${realIdx}"></td>
       <td><span class="badge badge-blue">${group.length}개</span></td>
       <td><div style="display:flex;flex-direction:column;gap:2px">${radios}</div></td>
-      <td id="dedup-del-${idx}" style="font-size:12px;color:#D94F3D">${deletedNames}</td>
-      <td><button class="btn-sm btn-green" onclick="applyDedup(${idx})">병합</button></td>
+      <td id="dedup-del-${realIdx}" style="font-size:12px;color:#D94F3D">${deletedNames}</td>
+      <td style="display:flex;gap:4px;flex-wrap:wrap">
+        <button class="btn-sm btn-green" onclick="applyDedup(${realIdx})">병합</button>
+        <button class="btn-sm btn-outline" onclick="ignoreDedup(${realIdx})">무시</button>
+      </td>
     </tr>`;
   }).join('');
+  renderDedupPagination();
+  const allCheck = document.getElementById('dedup-check-all');
+  if (allCheck) allCheck.checked = false;
 }
 
-function updateDedupDeleteCol(idx) {
-  const group = dedupGroups[idx];
+function renderDedupPagination() {
+  const total = dedupGroups.length;
+  const totalPages = Math.ceil(total / DEDUP_PAGE_SIZE);
+  const container = document.getElementById('dedup-pagination');
+  if (totalPages <= 1) { container.innerHTML = ''; return; }
+  let html = '';
+  for (let i = 0; i < totalPages; i++) {
+    const active = i === dedupPage;
+    html += `<button onclick="goDedupPage(${i})" style="padding:4px 10px;border-radius:6px;border:1px solid ${active?'#4A7C59':'#EBF2EE'};background:${active?'#4A7C59':'white'};color:${active?'white':'#1A1F1C'};font-size:12px;cursor:pointer">${i+1}</button>`;
+  }
+  container.innerHTML = html;
+}
+
+function goDedupPage(page) {
+  dedupPage = page;
+  renderDedupList();
+}
+
+function toggleDedupCheckAll(checked) {
+  document.querySelectorAll('.dedup-check').forEach(cb => cb.checked = checked);
+}
+
+function updateDedupDeleteCol(realIdx) {
+  const group = dedupGroups[realIdx];
   if (!group) return;
-  const checked = document.querySelector(`input[name="dedup-keep-${idx}"]:checked`);
+  const checked = document.querySelector(`input[name="dedup-keep-${realIdx}"]:checked`);
   if (!checked) return;
   const keepId = checked.value;
-  const cell = document.getElementById(`dedup-del-${idx}`);
+  const cell = document.getElementById(`dedup-del-${realIdx}`);
   if (cell) cell.textContent = group.filter(i => i.id !== keepId).map(i => i.name).join(', ');
 }
 
-async function applyDedup(groupIdx) {
+function ignoreDedup(realIdx) {
+  dedupGroups.splice(realIdx, 1);
+  const maxPage = Math.max(0, Math.ceil(dedupGroups.length / DEDUP_PAGE_SIZE) - 1);
+  if (dedupPage > maxPage) dedupPage = maxPage;
+  document.getElementById('dedup-count').textContent = `${dedupGroups.length}개 그룹 발견`;
+  renderDedupList();
+}
+
+async function applyDedupSelected() {
+  const checkboxes = document.querySelectorAll('.dedup-check:checked');
+  if (!checkboxes.length) { toast('선택된 그룹이 없어요', 'red'); return; }
+  const indices = Array.from(checkboxes).map(cb => parseInt(cb.dataset.idx)).sort((a, b) => b - a);
+  if (!confirm(`선택한 ${indices.length}개 그룹을 병합할까요? 되돌릴 수 없어요.`)) return;
+  for (const idx of indices) {
+    await applyDedup(idx, true);
+  }
+  const maxPage = Math.max(0, Math.ceil(dedupGroups.length / DEDUP_PAGE_SIZE) - 1);
+  if (dedupPage > maxPage) dedupPage = maxPage;
+  document.getElementById('dedup-count').textContent = `${dedupGroups.length}개 그룹 발견`;
+  renderDedupList();
+  toast(`선택 병합 완료 ✓`);
+}
+
+async function applyDedup(groupIdx, skipRender = false) {
   const group = dedupGroups[groupIdx];
   if (!group) return;
   const checked = document.querySelector(`input[name="dedup-keep-${groupIdx}"]:checked`);
@@ -4012,59 +4071,28 @@ async function applyDedup(groupIdx) {
   }
 
   for (const delItem of deleteItems) {
-    // ingredients 삭제
+    // merge: food_ingredients를 keepId로 자동 재매핑 후 삭제
     try {
-      const r = await fetch(`${API}/admin/ingredients/${delItem.id}`, { method: 'DELETE' });
-      if (!r.ok && r.status !== 204) { toast(`삭제 실패: ${delItem.name}`, 'red'); continue; }
+      const r = await fetch(`${API}/admin/ingredients/${delItem.id}/merge`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ merge_into_id: keepId }),
+      });
+      if (!r.ok) { toast(`병합 실패: ${delItem.name}`, 'red'); continue; }
     } catch(e) { console.error(e); continue; }
-
-    // 영향 상품 main_ingredients 업데이트
-    const affectedFoods = allFoods.filter(f => {
-      const mi = f.main_ingredients;
-      if (mi?.length) return mi.some(x => (typeof x === 'string' ? x : x.name) === delItem.name);
-      return f.ingredients ? f.ingredients.includes(delItem.name) : false;
-    });
-    for (const food of affectedFoods) {
-      try {
-        let newList;
-        const cur = food.main_ingredients;
-        if (!cur?.length && food.ingredients) {
-          const PCT_RE = /^(.+?)\s*\((\d+(?:\.\d+)?)%\)\s*$/;
-          newList = food.ingredients.split(',').map(s => {
-            const t = s.trim(); if (!t) return null;
-            const m = t.match(PCT_RE);
-            const name = m ? m[1].trim() : t;
-            return { name: name === delItem.name ? keepItem.name : name, pct: m ? parseFloat(m[2]) : null };
-          }).filter(Boolean);
-        } else {
-          newList = (cur ?? []).map(x => {
-            const name = typeof x === 'string' ? x : x.name;
-            const pct = typeof x === 'string' ? null : (x.pct ?? null);
-            return { name: name === delItem.name ? keepItem.name : name, pct };
-          });
-        }
-        const delNameRE = new RegExp(delItem.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
-        const patchBody = { main_ingredients: newList };
-        if (food.ingredients?.includes(delItem.name)) {
-          patchBody.ingredients = food.ingredients.replace(delNameRE, keepItem.name);
-        }
-        await fetch(`${API}/foods/${food.id}`, {
-          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(patchBody),
-        });
-        // food_ingredients 조인 테이블도 동기화 (keepItem.name으로 매핑)
-        await syncFoodJunctionTable(food.id, newList);
-      } catch(e) { console.error('food update failed:', food.id, e); }
-    }
 
     // allIngredients 캐시에서 삭제
     allIngredients = allIngredients.filter(i => i.id !== delItem.id);
   }
 
   dedupGroups.splice(groupIdx, 1);
-  document.getElementById('dedup-count').textContent = `${dedupGroups.length}개 그룹 발견`;
-  renderDedupList();
-  toast(`병합 완료: ${keepItem.name}으로 통합`);
+  if (!skipRender) {
+    const maxPage = Math.max(0, Math.ceil(dedupGroups.length / DEDUP_PAGE_SIZE) - 1);
+    if (dedupPage > maxPage) dedupPage = maxPage;
+    document.getElementById('dedup-count').textContent = `${dedupGroups.length}개 그룹 발견`;
+    renderDedupList();
+    toast(`병합 완료: ${keepItem.name}으로 통합`);
+  }
 }
 
 async function applyDedupAll() {
