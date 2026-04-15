@@ -436,7 +436,7 @@ tr:hover td { background: #FAFAF7; }
           <option value="no_junction">원재료 미연결</option>
           <option value="partial_junction">원재료 부분연결</option>
         </select>
-        <select class="filter-select" id="foods-perpage" onchange="foodsPerPage=+this.value;foodsPage=1;renderFoodsPage()">
+        <select class="filter-select" id="foods-perpage" onchange="foodsPerPage=+this.value;loadFoods(1)">
           <option value="20">20개</option>
           <option value="50">50개</option>
           <option value="100">100개</option>
@@ -1034,7 +1034,8 @@ function buildSeqMap(arr) {
   sorted.forEach((x,i) => { map[x.id] = i + 1; });
   return map;
 }
-let filteredFoods = [], foodsPage = 1, foodsPerPage = 20;
+let foodsItems = [], foodsTotal = 0, foodsPage = 1, foodsPerPage = 20;
+let filteredFoods = [];
 let filteredBrands = [], brandsPage = 1, brandsPerPage = 20;
 let filteredIngredients = [], ingredientsPage = 1, ingredientsPerPage = 20;
 
@@ -1079,12 +1080,10 @@ function showPage(name) {
   if (idx >= 0) document.querySelectorAll('.nav-item')[idx].classList.add('active');
 
   if (name === 'foods') {
-    if (allFoods.length === 0) loadFoods();
-    else filterFoods();
+    loadFoods(foodsPage);
   }
   if (name === 'barcode') { loadBarcodeStats(); loadMatchedFoods(); loadUnmatchedFoods(); }
   if (name === 'brands') {
-    if (allFoods.length === 0) loadFoods();  // 상품 수 표시를 위해 필요
     if (allBrands.length === 0) loadBrands();
     else { filterBrands(); renderBrandPreview(); renderBrandStats(); }
   }
@@ -1173,7 +1172,7 @@ async function loadDashboard() {
     // 브랜드 stats (allBrands가 로드됐으면 즉시, 아니면 별도 fetch)
     const brandsForDash = allBrands.length ? allBrands : await fetch(`${API}/brands`).then(r => r.json()).catch(() => []);
     if (!allBrands.length) { allBrands = brandsForDash; brandSeqMap = buildSeqMap(allBrands); }
-    const foodsForDash = allFoods.length ? allFoods : await fetch(`${API}/foods?limit=99999`).then(r => r.json()).catch(() => []);
+    const foodsForDash = allFoods.length ? allFoods : await fetch(`${API}/foods?limit=99999`).then(r => r.json().then(d => d.items || d)).catch(() => []);
     if (!allFoods.length) { allFoods = foodsForDash; foodSeqMap = buildSeqMap(allFoods); }
     const bTotal = brandsForDash.length;
     const bLogo = brandsForDash.filter(b => b.logo_url).length;
@@ -1211,64 +1210,37 @@ function renderRecentMatches(foods) {
 }
 
 // ── 상품 탭 ───────────────────────────────────────────────────
-async function loadFoods() {
+async function loadFoods(page = 1) {
+  foodsPage = Math.max(1, page);
+  const q = (document.getElementById('foods-search')?.value || '').trim();
+  const cat = document.getElementById('foods-cat')?.value || '';
+  const species = document.getElementById('foods-species')?.value || '';
+  const brand = document.getElementById('foods-brand')?.value || '';
+  const missing = document.getElementById('foods-missing')?.value || '';
+  const params = new URLSearchParams({ limit: foodsPerPage, offset: (foodsPage - 1) * foodsPerPage });
+  if (q) params.set('q', q);
+  if (cat) params.set('category', cat);
+  if (species) params.set('species', species);
+  if (brand) params.set('brand', brand);
+  if (missing) params.set('missing', missing);
+  // 브랜드 드롭다운 최초 1회 allBrands로 채우기
+  const brandSel = document.getElementById('foods-brand');
+  if (brandSel && brandSel.options.length <= 1 && allBrands.length) {
+    brandSel.innerHTML = '<option value="">전체 브랜드</option>' +
+      allBrands.map(b => `<option value="${(b.name||'').replace(/"/g,'&quot;')}">${b.name||''}</option>`).join('');
+  }
   try {
-    const r = await fetch(`${API}/foods?limit=99999`);
+    const r = await fetch(`${API}/foods?${params}`);
     if (!r.ok) return;
-    allFoods = await r.json();
-    foodSeqMap = buildSeqMap(allFoods);
-    // 브랜드 드롭다운 채우기
-    const brandSet = [...new Set(allFoods.map(f => f.brand).filter(Boolean))].sort();
-    const sel = document.getElementById('foods-brand');
-    sel.innerHTML = '<option value="">전체 브랜드</option>' + brandSet.map(b => `<option value="${b.replace(/"/g,'&quot;')}">${b}</option>`).join('');
-    filterFoods();
+    const data = await r.json();
+    foodsItems = data.items || [];
+    foodsTotal = data.total || 0;
+    renderFoodsPage();
   } catch(e) { console.error(e); }
 }
 
 function filterFoods() {
-  const q = document.getElementById('foods-search').value.toLowerCase();
-  const cat = document.getElementById('foods-cat').value;
-  const species = document.getElementById('foods-species').value;
-  const missing = document.getElementById('foods-missing').value;
-  const brand = document.getElementById('foods-brand').value;
-
-  // no_junction / partial_junction 은 API 기반 필터 (별도 처리)
-  if (missing === 'no_junction' || missing === 'partial_junction') {
-    filterFoodsByJunction(missing, q, cat, species, brand);
-    return;
-  }
-
-  filteredFoods = allFoods.filter(f => {
-    const matchQ = !q || (f.name||'').toLowerCase().includes(q) || (f.brand||'').toLowerCase().includes(q);
-    const matchCat = !cat || f.category === cat;
-    const matchSpecies = !species || f.target_species === species || f.target_species === 'both';
-    const matchMissing = !missing ||
-      (missing === 'no_image' && !f.image_url) ||
-      (missing === 'no_barcode' && !f.barcode) ||
-      (missing === 'no_ingredients' && !f.ingredients) ||
-      (missing === 'no_brand' && !f.brand_id);
-    const matchBrand = !brand || (f.brand||'') === brand;
-    return matchQ && matchCat && matchSpecies && matchMissing && matchBrand;
-  }).sort((a, b) => (foodSeqMap[b.id]||0) - (foodSeqMap[a.id]||0));
-  foodsPage = 1;
-  renderFoodsPage();
-}
-
-async function filterFoodsByJunction(type, q, cat, species, brand) {
-  try {
-    const rows = await fetch(`${API}/admin/unlinked-foods?type=${type}&limit=2000`).then(r => r.json());
-    const ids = new Set(rows.map(r => r.id));
-    filteredFoods = allFoods.filter(f => {
-      if (!ids.has(f.id)) return false;
-      const matchQ = !q || (f.name||'').toLowerCase().includes(q) || (f.brand||'').toLowerCase().includes(q);
-      const matchCat = !cat || f.category === cat;
-      const matchSpecies = !species || f.target_species === species || f.target_species === 'both';
-      const matchBrand = !brand || (f.brand||'') === brand;
-      return matchQ && matchCat && matchSpecies && matchBrand;
-    }).sort((a, b) => (foodSeqMap[b.id]||0) - (foodSeqMap[a.id]||0));
-    foodsPage = 1;
-    renderFoodsPage();
-  } catch(e) { console.error(e); toast('필터 로드 실패', 'red'); }
+  loadFoods(1);
 }
 
 function setFoodsMissing(value) {
@@ -1277,24 +1249,21 @@ function setFoodsMissing(value) {
 }
 
 function gotoFoodsPage(p) {
-  const totalPages = Math.ceil(filteredFoods.length / foodsPerPage);
-  foodsPage = Math.max(1, Math.min(p, totalPages));
-  renderFoodsPage();
+  loadFoods(p);
 }
 
 function renderFoodsPage() {
-  document.getElementById('foods-table-count').textContent = filteredFoods.length + '개';
+  document.getElementById('foods-table-count').textContent = foodsTotal.toLocaleString() + '개';
   const tbody = document.getElementById('foods-tbody');
-  if (!filteredFoods.length) {
-    tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="empty-icon">📭</div><div class="empty-title">검색 결과가 없어요</div></div></td></tr>';
+  if (!foodsItems.length) {
+    tbody.innerHTML = '<tr><td colspan="9"><div class="empty-state"><div class="empty-icon">📭</div><div class="empty-title">검색 결과가 없어요</div></div></td></tr>';
     document.getElementById('foods-pagination').innerHTML = '';
     return;
   }
-  const slice = filteredFoods.slice((foodsPage - 1) * foodsPerPage, foodsPage * foodsPerPage);
   const startIdx = (foodsPage - 1) * foodsPerPage;
-  tbody.innerHTML = slice.map((f, idx) => `
+  tbody.innerHTML = foodsItems.map((f, idx) => `
     <tr>
-      <td style="font-size:11px;color:#C2C9C5;text-align:center;font-family:'Courier New',monospace" title="${f.id}">${foodSeqMap[f.id]||''}</td>
+      <td style="font-size:11px;color:#C2C9C5;text-align:center;font-family:'Courier New',monospace" title="${f.id}">${startIdx + idx + 1}</td>
       <td>
         <div class="food-cell">
           <div class="food-thumb">
@@ -1306,7 +1275,7 @@ function renderFoodsPage() {
           </div>
         </div>
       </td>
-      <td style="font-size:12px;font-weight:700;color:#4A7C59;cursor:pointer" onclick="document.getElementById('foods-brand').value='${(f.brand||'').replace(/'/g,"\\'")}';filterFoods()">${f.brand||'—'}</td>
+      <td style="font-size:12px;font-weight:700;color:#4A7C59;cursor:pointer" onclick="document.getElementById('foods-brand').value='${(f.brand||'').replace(/'/g,"\\'")}';loadFoods(1)">${f.brand||'—'}</td>
       <td><span class="badge ${f.category==='food'?'badge-green':'badge-amber'}">${f.category==='food'?'사료':f.category==='snack'?'간식':f.category}</span></td>
       <td>${f.target_species==='dog'?'🐶':f.target_species==='cat'?'🐱':'🐾'}</td>
       <td><span class="badge ${f.image_url?'badge-green':'badge-red'}">${f.image_url?'✓ 있음':'✗ 없음'}</span></td>
@@ -1315,7 +1284,7 @@ function renderFoodsPage() {
       <td><button class="btn-sm btn-outline" style="background:white;color:#4A7C59;border:1px solid #C2C9C5" onclick="openFoodDetail('${f.id}')">상세</button></td>
     </tr>
   `).join('');
-  renderPagination('foods-pagination', filteredFoods.length, foodsPage, foodsPerPage, 'gotoFoodsPage');
+  renderPagination('foods-pagination', foodsTotal, foodsPage, foodsPerPage, 'gotoFoodsPage');
 }
 
 // ── 바코드 탭 전환 ────────────────────────────────────────────
@@ -1390,7 +1359,7 @@ async function loadUnmatchedFoods() {
   try {
     const r = await fetch(`${API}/foods?limit=99999`);
     if (!r.ok) return;
-    const all = await r.json();
+    const all = (await r.json()).items || [];
     unmatchedFoods = all.filter(f => !f.barcode);
     document.getElementById('unmatched-count').textContent = unmatchedFoods.length + '개';
     filterUnmatched();
@@ -3528,7 +3497,7 @@ async function openIngredientNameEdit(id, name) {
   if (!allFoods.length) {
     try {
       const r = await fetch(`${API}/foods?limit=5000`);
-      if (r.ok) { allFoods = await r.json(); foodSeqMap = buildSeqMap(allFoods); }
+      if (r.ok) { const d = await r.json(); allFoods = d.items || d; foodSeqMap = buildSeqMap(allFoods); }
     } catch(e) { console.error(e); }
   }
 
@@ -3723,7 +3692,7 @@ async function loadCleanupList() {
   if (!allFoods.length) {
     try {
       const r = await fetch(`${API}/foods?limit=5000`);
-      if (r.ok) { allFoods = await r.json(); foodSeqMap = buildSeqMap(allFoods); }
+      if (r.ok) { const d = await r.json(); allFoods = d.items || d; foodSeqMap = buildSeqMap(allFoods); }
     } catch(e) { console.error(e); }
   }
 
@@ -4066,7 +4035,7 @@ async function applyDedup(groupIdx, skipRender = false) {
   if (!allFoods.length) {
     try {
       const r = await fetch(`${API}/foods?limit=5000`);
-      if (r.ok) { allFoods = await r.json(); foodSeqMap = buildSeqMap(allFoods); }
+      if (r.ok) { const d = await r.json(); allFoods = d.items || d; foodSeqMap = buildSeqMap(allFoods); }
     } catch(e) { console.error(e); }
   }
 
