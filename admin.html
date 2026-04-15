@@ -893,7 +893,7 @@ tr:hover td { background: #FAFAF7; }
           <option value="방부제">방부제</option>
           <option value="기능성">기능성</option>
         </select>
-        <select class="filter-select" id="ingredients-perpage" onchange="ingredientsPerPage=+this.value;ingredientsPage=1;renderIngredientsPage()">
+        <select class="filter-select" id="ingredients-perpage" onchange="ingredientsPerPage=+this.value;loadIngredients(1)">
           <option value="20">20개</option>
           <option value="50">50개</option>
           <option value="100">100개</option>
@@ -1038,6 +1038,7 @@ let foodsItems = [], foodsTotal = 0, foodsPage = 1, foodsPerPage = 20;
 let filteredFoods = [];
 let filteredBrands = [], brandsPage = 1, brandsPerPage = 20;
 let filteredIngredients = [], ingredientsPage = 1, ingredientsPerPage = 20;
+let ingredientsItems = [], ingredientsTotal = 0;
 
 function renderPagination(containerId, total, page, perPage, gotoFn) {
   const el = document.getElementById(containerId);
@@ -1089,7 +1090,7 @@ function showPage(name) {
   }
   if (name === 'users') loadUsers();
   if (name === 'pets-admin') loadPetsAdmin();
-  if (name === 'ingredients') { loadIngredients(); loadCoverageStats(); }
+  if (name === 'ingredients') { loadIngredients(1); loadAllIngredients(); loadCoverageStats(); }
   if (name === 'foods') { loadFoodsStats(); }
 }
 
@@ -2445,7 +2446,7 @@ function matchIngredient(rawName, ingMap) {
 }
 
 async function reparseIngSmartSplit() {
-  if (!allIngredients.length) await loadIngredients();
+  if (!allIngredients.length) await loadAllIngredients();
   const raw = document.getElementById('fd-ingredients').value || '';
   if (!raw.trim()) { toast('원재료 텍스트가 없어요', 'red'); return; }
 
@@ -2641,7 +2642,8 @@ function filterFdIngDropdown() {
   _fdIngDebounce = setTimeout(async () => {
     try {
       const r = await fetch(`${API}/admin/ingredients?q=${encodeURIComponent(q)}&limit=20`);
-      const items = await r.json();
+      const d = await r.json();
+      const items = d.items || [];
       // ingredient_id가 이미 연결된 것만 제외 (이름만 같고 미연결인 태그는 "🔗 연결" 옵션으로 표시)
       // 백엔드가 이미 정확도 순(완전일치→시작일치→포함) 정렬해서 반환하므로 순서 유지
       const matches = items
@@ -2967,34 +2969,37 @@ async function saveBrandEdit() {
 // ── 원재료 태그 입력 (등록된 원재료만 허용) ──────────────────
 let ingredientTags = [];
 
+let _fcIngDebounce = null;
 function filterIngredientDropdown() {
-  const q = document.getElementById('fc-ingredients-input').value.trim().toLowerCase();
+  const q = document.getElementById('fc-ingredients-input').value.trim();
   const dropdown = document.getElementById('fc-ingredients-dropdown');
   if (!q) { dropdown.style.display = 'none'; return; }
-
-  const filtered = allIngredients.filter(i =>
-    ((i.name||'').toLowerCase().includes(q) || (i.name_en||'').toLowerCase().includes(q))
-    && !ingredientTags.some(t => t.name === i.name)
-  );
-
-  if (!filtered.length) {
-    dropdown.style.display = 'block';
-    dropdown.innerHTML = `<div style="padding:12px;font-size:12px;color:#C2C9C5;text-align:center">등록된 원재료가 없어요. 원재료 관리에서 먼저 등록해주세요.</div>`;
-    return;
-  }
-  dropdown.style.display = 'block';
-  dropdown.innerHTML = filtered.slice(0, 10).map(i => `
-    <div onclick="selectIngredient('${i.id}','${i.name.replace(/'/g,"\\'")}')"
-      style="padding:10px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #F5F5F3;display:flex;align-items:center;gap:8px"
-      onmouseover="this.style.background='#EBF2EE'" onmouseout="this.style.background='white'">
-      <div style="flex:1">
-        <div style="font-weight:700">${i.name}</div>
-        ${i.name_en ? `<div style="font-size:10px;color:#6B7570">${i.name_en}</div>` : ''}
-      </div>
-      ${i.grade ? `<span class="badge ${GRADE_COLOR[i.grade]||'badge-gray'}" style="font-size:10px">${i.grade}</span>` : ''}
-      ${i.is_harmful ? `<span class="badge badge-red" style="font-size:10px">⚠</span>` : ''}
-    </div>
-  `).join('');
+  clearTimeout(_fcIngDebounce);
+  _fcIngDebounce = setTimeout(async () => {
+    try {
+      const r = await fetch(`${API}/admin/ingredients?q=${encodeURIComponent(q)}&limit=10`);
+      const d = await r.json();
+      const items = (d.items || []).filter(i => !ingredientTags.some(t => t.name === i.name));
+      if (!items.length) {
+        dropdown.style.display = 'block';
+        dropdown.innerHTML = `<div style="padding:12px;font-size:12px;color:#C2C9C5;text-align:center">등록된 원재료가 없어요. 원재료 관리에서 먼저 등록해주세요.</div>`;
+        return;
+      }
+      dropdown.style.display = 'block';
+      dropdown.innerHTML = items.map(i => `
+        <div onclick="selectIngredient('${i.id}','${i.name.replace(/'/g,"\\'")}')"
+          style="padding:10px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #F5F5F3;display:flex;align-items:center;gap:8px"
+          onmouseover="this.style.background='#EBF2EE'" onmouseout="this.style.background='white'">
+          <div style="flex:1">
+            <div style="font-weight:700">${i.name}</div>
+            ${i.name_en ? `<div style="font-size:10px;color:#6B7570">${i.name_en}</div>` : ''}
+          </div>
+          ${i.grade ? `<span class="badge ${GRADE_COLOR[i.grade]||'badge-gray'}" style="font-size:10px">${i.grade}</span>` : ''}
+          ${i.is_harmful ? `<span class="badge badge-red" style="font-size:10px">⚠</span>` : ''}
+        </div>
+      `).join('');
+    } catch { dropdown.style.display = 'none'; }
+  }, 200);
 }
 
 function selectIngredient(id, name) {
@@ -3121,7 +3126,7 @@ openFoodCreateModal = function() {
   document.getElementById('fc-ingredients-dropdown').style.display = 'none';
   // 원재료/브랜드 목록이 없으면 로드
   if (allBrands.length === 0) loadBrands();
-  if (allIngredients.length === 0) loadIngredients();
+  if (allIngredients.length === 0) loadAllIngredients();
 };
 
 // ── 유저 관리 ─────────────────────────────────────────────────
@@ -3372,56 +3377,62 @@ async function rebuildIngredientsFromScratch() {
     // 캐시 전체 초기화 후 재로드
     allIngredients = [];
     allFoods = [];
-    await Promise.all([loadIngredients(), loadCoverageStats()]);
+    await Promise.all([loadIngredients(1), loadAllIngredients(), loadCoverageStats()]);
   } catch(e) { console.error(e); toast('오류 발생', 'red'); }
   finally { btn.disabled = false; btn.textContent = '🔄 전체 재건'; }
 }
 
-async function loadIngredients({ keepPage = false } = {}) {
+async function loadIngredients(page = 1) {
+  try {
+    ingredientsPage = page;
+    const q = document.getElementById('ingredients-search').value;
+    const grade = document.getElementById('ingredients-grade').value;
+    const category = document.getElementById('ingredients-category').value;
+    const params = new URLSearchParams({ limit: ingredientsPerPage, offset: (page - 1) * ingredientsPerPage });
+    if (q) params.set('q', q);
+    if (grade) params.set('grade', grade);
+    if (category) params.set('category', category);
+    const r = await fetch(`${API}/admin/ingredients?${params}`);
+    if (!r.ok) return;
+    const d = await r.json();
+    ingredientsItems = d.items || [];
+    ingredientsTotal = d.total || 0;
+    document.getElementById('ingredients-count').textContent = ingredientsTotal + '개';
+    renderIngredientsPage();
+  } catch(e) { console.error(e); }
+}
+
+async function loadAllIngredients() {
   try {
     const r = await fetch(`${API}/admin/ingredients?limit=20000`);
     if (!r.ok) return;
-    allIngredients = await r.json();
+    const d = await r.json();
+    allIngredients = d.items || d;
     ingSeqMap = buildSeqMap(allIngredients);
-    document.getElementById('ingredients-count').textContent = allIngredients.length + '개';
-    filterIngredients({ keepPage });
   } catch(e) { console.error(e); }
 }
 
 const GRADE_COLOR = { 'S+':'badge-green','S':'badge-green','A':'badge-green','B':'badge-blue','B-':'badge-blue','C':'badge-amber','C-':'badge-amber','D':'badge-red' };
 
-function filterIngredients({ keepPage = false } = {}) {
-  const q = document.getElementById('ingredients-search').value.toLowerCase();
-  const grade = document.getElementById('ingredients-grade').value;
-  const category = document.getElementById('ingredients-category').value;
-  filteredIngredients = allIngredients.filter(i => {
-    const mq = !q || (i.name||'').toLowerCase().includes(q) || (i.name_en||'').toLowerCase().includes(q);
-    const mg = !grade || i.grade === grade;
-    const mc = !category || i.category === category;
-    return mq && mg && mc;
-  }).sort((a, b) => (ingSeqMap[b.id]||0) - (ingSeqMap[a.id]||0));
-  if (!keepPage) ingredientsPage = 1;
-  renderIngredientsPage();
+function filterIngredients() {
+  loadIngredients(1);
 }
 
 function gotoIngredientsPage(p) {
-  const totalPages = Math.ceil(filteredIngredients.length / ingredientsPerPage);
-  ingredientsPage = Math.max(1, Math.min(p, totalPages));
-  renderIngredientsPage();
+  loadIngredients(p);
 }
 
 function renderIngredientsPage() {
   const tbody = document.getElementById('ingredients-tbody');
-  if (!filteredIngredients.length) {
+  if (!ingredientsItems.length) {
     tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">🌿</div><div class="empty-title">원재료가 없어요</div><div class="empty-sub">+ 원재료 등록 버튼으로 추가해주세요</div></div></td></tr>';
     document.getElementById('ingredients-pagination').innerHTML = '';
     return;
   }
-  const slice = filteredIngredients.slice((ingredientsPage - 1) * ingredientsPerPage, ingredientsPage * ingredientsPerPage);
-  const iStartIdx = (ingredientsPage - 1) * ingredientsPerPage;
-  tbody.innerHTML = slice.map((i, idx) => `
+  const startIdx = (ingredientsPage - 1) * ingredientsPerPage;
+  tbody.innerHTML = ingredientsItems.map((i, idx) => `
     <tr>
-      <td style="font-size:11px;color:#C2C9C5;text-align:center;font-family:'Courier New',monospace" title="${i.id}">${ingSeqMap[i.id]||''}</td>
+      <td style="font-size:11px;color:#C2C9C5;text-align:center;font-family:'Courier New',monospace" title="${i.id}">${startIdx + idx + 1}</td>
       <td><div style="font-weight:700;font-size:13px">${i.name||'—'}</div>${i.description ? `<div style="font-size:10px;color:#6B7570;margin-top:2px">${i.description.slice(0,30)}</div>` : ''}</td>
       <td style="font-size:12px;color:#6B7570">${i.name_en||'—'}</td>
       <td>${i.grade ? `<span class="badge ${GRADE_COLOR[i.grade]||'badge-gray'}">${i.grade}</span>` : '—'}</td>
@@ -3434,7 +3445,7 @@ function renderIngredientsPage() {
       </td>
     </tr>
   `).join('');
-  renderPagination('ingredients-pagination', filteredIngredients.length, ingredientsPage, ingredientsPerPage, 'gotoIngredientsPage');
+  renderPagination('ingredients-pagination', ingredientsTotal, ingredientsPage, ingredientsPerPage, 'gotoIngredientsPage');
 }
 
 function openIngredientCreateModal() {
@@ -3454,7 +3465,7 @@ async function importIngredientsFromFoods() {
     const r = await fetch(`${API}/admin/ingredients/import-from-foods`, { method: 'POST' });
     const d = await r.json();
     toast(`${d.imported}개 원재료 추가됨 (기존 ${d.already_existed}개)`);
-    loadIngredients();
+    loadIngredients(1);
   } catch { toast('임포트 실패', 'red'); }
 }
 async function saveIngredientCreate() {
@@ -3476,7 +3487,7 @@ async function saveIngredientCreate() {
     if (r.ok) {
       toast('원재료가 등록됐어요 ✓');
       closeIngredientCreateModal();
-      loadIngredients();
+      loadIngredients(1);
     } else {
       const err = await r.json();
       toast(err.detail || '등록 실패', 'red');
@@ -3621,8 +3632,7 @@ async function saveIngredientNameEdit() {
   }
 
   closeIngredientEditModal();
-  ingredientsPage = _savedPage;
-  filterIngredients({ keepPage: true });
+  loadIngredients(_savedPage);
 }
 
 document.getElementById('ingredient-edit-modal')?.addEventListener('click', e => {
@@ -3653,8 +3663,7 @@ async function deleteIngredient(id, name, foodCount) {
         }
       });
       toast(`삭제됐어요${linkedCount > 0 ? ` (상품 ${linkedCount}개 반영)` : ''}`);
-      ingredientsPage = _savedPage;
-      filterIngredients({ keepPage: true });
+      loadIngredients(_savedPage);
     } else {
       toast('삭제 실패', 'red');
     }
@@ -3688,7 +3697,7 @@ function parsePctName(name) {
 }
 
 async function loadCleanupList() {
-  if (!allIngredients.length) await loadIngredients();
+  if (!allIngredients.length) await loadAllIngredients();
   if (!allFoods.length) {
     try {
       const r = await fetch(`${API}/foods?limit=5000`);
@@ -3842,7 +3851,7 @@ async function applyCleanupAll() {
   for (const item of [...cleanupItems]) {
     await applyCleanup(item);
   }
-  loadIngredients();
+  loadIngredients(1);
   toast('전체 정리 완료 ✓');
 }
 
@@ -3921,7 +3930,7 @@ function groupBySynonym(list) {
 }
 
 async function loadDedupList() {
-  if (!allIngredients.length) await loadIngredients();
+  if (!allIngredients.length) await loadAllIngredients();
   const fns = { space: groupBySpace, special: groupBySpecial, prefix: groupByPrefix, synonym: groupBySynonym };
   dedupGroups = fns[dedupTabActive](allIngredients);
   dedupPage = 0;
