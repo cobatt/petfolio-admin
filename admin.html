@@ -2323,8 +2323,11 @@ async function openFoodDetail(foodId) {
     document.getElementById('fd-moisture').value = f.moisture != null ? f.moisture + '%' : '';
     document.getElementById('fd-ingredients').value = f.ingredients || '';
     _fdMainIngredients = Array.isArray(f.main_ingredients) && f.main_ingredients.length ? f.main_ingredients : null;
-    // food_ingredients 조인 데이터: 상품 응답의 structured_ingredients 사용
+    // food_ingredients 조인 데이터: structured_ingredients를 order_idx 순으로 정렬
     _fdJunctionItems = f.structured_ingredients?.length ? f.structured_ingredients : null;
+    fdIngredientTags = (f.structured_ingredients ?? [])
+      .sort((a, b) => (a.order_idx ?? 0) - (b.order_idx ?? 0))
+      .map(i => ({ id: i.ingredient_id, name: i.ingredient_name, pct: i.pct }));
     renderFdIngTagsReadonly();
     // 이미지
     const img = document.getElementById('fd-image');
@@ -2407,6 +2410,7 @@ function clearFdBrand() {
   document.getElementById('fd-brand-input').focus();
 }
 let fdIngTags = []; // [{name, pct, ingredient_id: string|null}]
+let fdIngredientTags = []; // food_ingredients 기반 태그 [{id, name, pct}]
 let _fdJunctionItems = null; // food_ingredients API 응답 캐시
 let _fdMainIngredients = null; // food.main_ingredients 원본 순서 캐시
 
@@ -2503,28 +2507,11 @@ function initFdIngTags() {
 function renderFdIngTagsReadonly() {
   const el = document.getElementById('fd-ing-view');
 
-  // _fdJunctionItems: 연결된 항목만 있음 (INNER JOIN 결과)
-  // _fdMainIngredients: 전체 원재료 목록 (연결 여부 무관)
-  const linkedNames = new Set((_fdJunctionItems || []).map(fi => fi.ingredient_name));
-
-  if (_fdMainIngredients && _fdMainIngredients.length > 0) {
-    let unlinkedCount = 0;
-    const html = _fdMainIngredients.map(mi => {
-      const name = typeof mi === 'string' ? mi : mi.name;
-      const pct = (typeof mi === 'object' && mi.pct != null) ? mi.pct : null;
-      const linked = linkedNames.has(name);
-      if (!linked) unlinkedCount++;
-      const bg = linked ? '#EBF2EE' : '#FEF3E2';
-      const color = linked ? '#1A1F1C' : '#B47B40';
-      const border = linked ? 'none' : '1px solid #F5C87A';
-      const tip = linked ? '원재료 DB 연결됨' : '미연결 — 원재료 DB에 없는 항목';
-      const pctHtml = pct != null ? ` <span style="color:#9CA8A1;font-size:10px">${pct}%</span>` : '';
-      return `<span title="${tip}" style="display:inline-flex;align-items:center;gap:3px;background:${bg};border:${border};color:${color};padding:2px 8px;border-radius:12px;margin:2px 3px;font-size:11px;font-weight:${linked?'400':'600'}">${name}${pctHtml}</span>`;
+  if (fdIngredientTags.length > 0) {
+    el.innerHTML = fdIngredientTags.map(fi => {
+      const pctHtml = fi.pct != null ? ` <span style="color:#9CA8A1;font-size:10px">${fi.pct}%</span>` : '';
+      return `<span title="원재료 DB 연결됨" style="display:inline-flex;align-items:center;gap:3px;background:#EBF2EE;color:#1A1F1C;padding:2px 8px;border-radius:12px;margin:2px 3px;font-size:11px">${fi.name}${pctHtml}</span>`;
     }).join('');
-    const legend = unlinkedCount
-      ? `<div style="margin-top:6px;font-size:10px;color:#B47B40">⚠ 미연결 ${unlinkedCount}개 — 수정 모드에서 괄호 인식 재파싱을 사용해보세요</div>`
-      : '';
-    el.innerHTML = html + legend;
   } else {
     // fallback: 원본 텍스트 파싱
     const raw = document.getElementById('fd-ingredients').value || '';
