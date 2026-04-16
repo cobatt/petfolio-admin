@@ -3772,10 +3772,11 @@ async function applyCleanup(item) {
       if (cachedIng) cachedIng.name = item.cleanName;
     } else {
       // 중복 → merge endpoint로 food_ingredients 자동 재매핑 후 삭제
+      // pct 전달: 이름에 묻혀있던 함량을 NULL인 row에 채움
       const r = await fetch(`${API}/admin/ingredients/${item.id}/merge`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ merge_into_id: item.duplicateId }),
+        body: JSON.stringify({ merge_into_id: item.duplicateId, pct: item.pct ?? null }),
       });
       if (!r.ok) { toast('삭제 실패', 'red'); return; }
     }
