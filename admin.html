@@ -1232,7 +1232,7 @@ function renderFoodsPage() {
   const startIdx = (foodsPage - 1) * foodsPerPage;
   tbody.innerHTML = foodsItems.map((f, idx) => `
     <tr>
-      <td style="font-size:11px;color:#C2C9C5;text-align:center;font-family:'Courier New',monospace" title="${f.id}">${startIdx + idx + 1}</td>
+      <td style="font-size:11px;color:#C2C9C5;text-align:center;font-family:'Courier New',monospace" title="${f.id}">${foodsTotal - startIdx - idx}</td>
       <td>
         <div class="food-cell">
           <div class="food-thumb">
@@ -1582,7 +1582,7 @@ function renderBrandsPage() {
       : '<span style="color:#C2C9C5;font-size:12px">—</span>';
     return `
     <tr>
-      <td style="font-size:11px;color:#C2C9C5;text-align:center;font-family:'Courier New',monospace" title="${b.id}">${brandSeqMap[b.id]||''}</td>
+      <td style="font-size:11px;color:#C2C9C5;text-align:center;font-family:'Courier New',monospace" title="${b.id}">${filteredBrands.length - bStartIdx - idx}</td>
       <td>
         ${b.logo_url
           ? `<img src="${b.logo_url}" style="width:32px;height:32px;object-fit:contain;border-radius:6px;border:1px solid #EBF2EE;" onerror="this.style.display='none'">`
@@ -3125,7 +3125,7 @@ function filterUsers() {
   }
   tbody.innerHTML = list.map((u, idx) => `
     <tr>
-      <td style="font-size:11px;color:#C2C9C5;text-align:center;font-family:'Courier New',monospace" title="${u.id}">${userSeqMap[u.id]||''}</td>
+      <td style="font-size:11px;color:#C2C9C5;text-align:center;font-family:'Courier New',monospace" title="${u.id}">${list.length - idx}</td>
       <td><div style="font-weight:700;font-size:13px">${u.name||'—'}</div></td>
       <td style="font-size:12px;color:#6B7570">${u.email||'—'}</td>
       <td>
@@ -3185,7 +3185,7 @@ function filterPetsAdmin() {
   }
   tbody.innerHTML = list.map((p, idx) => `
     <tr>
-      <td style="font-size:11px;color:#C2C9C5;text-align:center;font-family:'Courier New',monospace" title="${p.id}">${petSeqMap[p.id]||''}</td>
+      <td style="font-size:11px;color:#C2C9C5;text-align:center;font-family:'Courier New',monospace" title="${p.id}">${list.length - idx}</td>
       <td>
         <div style="display:flex;align-items:center;gap:8px">
           <span style="font-size:20px">${p.emoji||'🐾'}</span>
@@ -3387,7 +3387,7 @@ function renderIngredientsPage() {
   const startIdx = (ingredientsPage - 1) * ingredientsPerPage;
   tbody.innerHTML = ingredientsItems.map((i, idx) => `
     <tr>
-      <td style="font-size:11px;color:#C2C9C5;text-align:center;font-family:'Courier New',monospace" title="${i.id}">${startIdx + idx + 1}</td>
+      <td style="font-size:11px;color:#C2C9C5;text-align:center;font-family:'Courier New',monospace" title="${i.id}">${ingredientsTotal - startIdx - idx}</td>
       <td><div style="font-weight:700;font-size:13px">${i.name||'—'}</div>${i.description ? `<div style="font-size:10px;color:#6B7570;margin-top:2px">${i.description.slice(0,30)}</div>` : ''}</td>
       <td style="font-size:12px;color:#6B7570">${i.name_en||'—'}</td>
       <td>${i.grade ? `<span class="badge ${GRADE_COLOR[i.grade]||'badge-gray'}">${i.grade}</span>` : '—'}</td>
