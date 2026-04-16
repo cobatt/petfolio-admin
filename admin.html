@@ -753,38 +753,6 @@ tr:hover td { background: #FAFAF7; }
       <div class="page-sub">원재료 등록 및 등급 관리</div>
     </div>
 
-    <!-- 데이터 연결 현황 -->
-    <div class="card" id="ing-coverage-section" style="margin-bottom:16px">
-      <div class="card-header">
-        <div class="card-title">🔗 데이터 연결 현황</div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <button class="btn btn-outline" onclick="loadCoverageStats()" style="font-size:11px;padding:5px 10px">새로고침</button>
-          <button class="btn btn-green" id="resync-btn" onclick="resyncFoodIngredients()" style="font-size:11px;padding:5px 12px" title="main_ingredients와 ingredients 테이블을 매칭해 food_ingredients를 재동기화">⚡ 재동기화</button>
-          <button class="btn btn-red" id="rebuild-btn" onclick="rebuildIngredientsFromScratch()" style="font-size:11px;padding:5px 12px" title="ingredients 원본 텍스트 기준으로 원재료·연결 데이터 전체 재건 (기존 데이터 삭제)">🔄 전체 재건</button>
-        </div>
-      </div>
-      <!-- 미연결 상품 목록 -->
-      <div id="cov-unlinked-section" style="display:none">
-        <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
-          <div style="font-size:12px;font-weight:700;color:#1A1F1C">미연결 상품 목록</div>
-          <select id="cov-filter-type" class="filter-select" style="font-size:11px;padding:4px 8px" onchange="loadUnlinkedFoods()">
-            <option value="no_junction">원재료 전혀 미연결</option>
-            <option value="partial_junction">원재료 부분 연결</option>
-            <option value="no_brand">브랜드 미연결</option>
-          </select>
-          <button class="btn-sm btn-outline" onclick="document.getElementById('cov-unlinked-section').style.display='none'">닫기</button>
-        </div>
-        <div id="cov-unlinked-list" style="max-height:300px;overflow-y:auto;border:1px solid #EBF2EE;border-radius:8px">
-          <div style="padding:20px;text-align:center;color:#C2C9C5;font-size:12px">로딩 중...</div>
-        </div>
-        <div id="cov-unlinked-count" style="font-size:11px;color:#6B7570;margin-top:6px"></div>
-      </div>
-      <div style="display:flex;gap:8px">
-        <button class="btn-sm btn-outline" onclick="toggleUnlinkedSection('no_junction')">📋 미연결 목록 보기</button>
-        <button class="btn-sm btn-outline" onclick="toggleUnlinkedSection('partial_junction')">⚠️ 부분연결 보기</button>
-      </div>
-    </div>
-
     <!-- 함량 정리 도우미 -->
     <div class="card" id="cleanup-card">
       <div class="card-header">
