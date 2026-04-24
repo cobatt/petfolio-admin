@@ -411,6 +411,7 @@ tr:hover td { background: #FAFAF7; }
           <span class="card-count" id="foods-table-count">0개</span>
           <button class="btn btn-green" onclick="openFoodCreateModal()">+ 상품 등록</button>
           <button class="btn btn-outline" onclick="syncIngredientStatus()" title="전체 상품의 원재료 연결 상태를 food_ingredients 기준으로 재계산">🔄 원재료 상태 동기화</button>
+          <button class="btn btn-outline" onclick="bulkSyncIngredientsText(this)" title="전체 상품의 원재료 텍스트를 food_ingredients 기준으로 재생성">📝 원재료 텍스트 일괄 동기화</button>
         </div>
       </div>
       <div class="toolbar">
@@ -769,10 +770,14 @@ tr:hover td { background: #FAFAF7; }
         </div>
       </div>
       <div id="cleanup-desc" style="font-size:12px;color:#6B7570;padding:12px 20px">
-        이름에 함량(%)이 포함된 원재료를 정리해요.
-        "가수분해연어(14%)" → ingredients 테이블 정리 + 해당 상품의 main_ingredients도 {name, pct} 형태로 동시 업데이트해요.
+        이름에 함량(%) 또는 단위(mg/kg, IU/kg, CFU/kg 등)가 포함된 원재료를 정리해요.
+        "가수분해연어(14%)" → cleanName + pct 분리, "타우린 500mg/kg" → cleanName + amount/unit 분리 후 food_ingredients 업데이트.
       </div>
       <div id="cleanup-list" style="display:none">
+        <div style="padding:8px 16px;border-bottom:1px solid #EBF2EE;display:flex;align-items:center;justify-content:space-between;background:#FAFAF7">
+          <span id="cleanup-total-label" style="font-size:12px;color:#6B7570"></span>
+          <button class="btn btn-outline" onclick="reloadCleanupList()">🔄 목록 새로고침</button>
+        </div>
         <div class="table-wrap">
           <table>
             <thead>
@@ -787,6 +792,7 @@ tr:hover td { background: #FAFAF7; }
             <tbody id="cleanup-tbody"></tbody>
           </table>
         </div>
+        <div id="cleanup-pagination" style="padding:8px 20px;border-top:1px solid #EBF2EE;display:flex;align-items:center;justify-content:space-between"></div>
         <div style="padding:12px 20px;border-top:1px solid #EBF2EE;background:#FAFAF7;display:flex;justify-content:flex-end">
           <button class="btn btn-red" onclick="applyCleanupAll()">⚡ 전체 일괄 정리</button>
         </div>
@@ -806,11 +812,15 @@ tr:hover td { background: #FAFAF7; }
         띄어쓰기·특수문자 차이로 중복 등록된 원재료를 찾아요.
         유지할 항목을 선택하고 나머지를 병합하세요.
       </div>
-      <div style="display:flex;gap:6px;margin:0 20px 12px;flex-wrap:wrap" id="dedup-tabs">
+      <div style="display:flex;gap:6px;margin:0 20px 12px;flex-wrap:wrap;align-items:center" id="dedup-tabs">
         <button class="btn btn-green dedup-tab" onclick="switchDedupTab('space')"   data-tab="space">띄어쓰기</button>
         <button class="btn btn-outline dedup-tab" onclick="switchDedupTab('special')" data-tab="special">특수문자</button>
+        <button class="btn btn-outline" onclick="reloadDedupList()" style="margin-left:auto">🔄 분석 새로고침</button>
       </div>
       <div id="dedup-list" style="display:none">
+        <div style="padding:8px 16px;border-bottom:1px solid #EBF2EE;background:#FAFAF7">
+          <span id="dedup-tab-count" style="font-size:12px;color:#6B7570"></span>
+        </div>
         <div class="table-wrap">
           <table>
             <thead>
@@ -841,7 +851,7 @@ tr:hover td { background: #FAFAF7; }
           <span class="card-count" id="ingredients-count">0개</span>
           <button class="btn btn-green" onclick="openIngredientCreateModal()">+ 원재료 등록</button>
           <button class="btn btn-outline" onclick="importIngredientsFromFoods()" title="상품에 등록된 원재료를 일괄 임포트">📥 상품에서 임포트</button>
-          <button class="btn btn-outline" onclick="cleanupOrphanIngredients()" title="ingredients에 없는 고아 food_ingredients 행 일괄 삭제">🧹 고아 정리</button>
+          <button class="btn btn-outline" onclick="cleanupOrphanIngredients()" title="어떤 상품에도 연결되지 않은 원재료 삭제">🧹 고아 원재료 정리</button>
         </div>
       </div>
       <div class="toolbar">
@@ -1246,6 +1256,46 @@ async function syncIngredientStatus() {
     const d = await r.json();
     toast(`${(d.updated_count || 0).toLocaleString()}개 상품 상태 동기화 완료`);
   } catch { toast('오류 발생', 'red'); }
+}
+
+async function bulkSyncIngredientsText(btn) {
+  if (!confirm('전체 상품의 원재료 텍스트를 food_ingredients 기준으로 재생성합니다.\n(food_ingredients가 있는 상품만 대상) 계속할까요?')) return;
+  const orig = btn.textContent;
+  btn.disabled = true; btn.textContent = '동기화 중...';
+  try {
+    const r = await fetch(`${API}/admin/foods/sync-ingredients-text`, { method: 'POST' });
+    if (!r.ok) { toast('동기화 실패', 'red'); return; }
+    const d = await r.json();
+    toast(`${(d.updated_count || 0).toLocaleString()}개 상품 원재료 텍스트 동기화 완료`);
+  } catch { toast('오류 발생', 'red'); }
+  finally { btn.disabled = false; btn.textContent = orig; }
+}
+
+async function syncFoodIngredientsText() {
+  if (!currentFoodId) return;
+  if (!confirm('food_ingredients 기준으로 원재료 텍스트를 재생성합니다. 계속할까요?')) return;
+  const btn = document.getElementById('fd-sync-ing-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '동기화 중...'; }
+  try {
+    const r = await fetch(`${API}/admin/foods/${currentFoodId}/sync-ingredients-text`, { method: 'POST' });
+    if (!r.ok) { toast('동기화 실패', 'red'); return; }
+    await openFoodDetail(currentFoodId);
+    toast('원재료 텍스트 동기화 완료');
+  } catch { toast('오류 발생', 'red'); }
+  finally { if (btn) { btn.disabled = false; btn.textContent = '📝 원재료 텍스트 동기화'; } }
+}
+
+function toggleIngRaw() {
+  const el = document.getElementById('fd-ing-raw');
+  const btn = document.getElementById('fd-ing-raw-toggle');
+  if (!el) return;
+  if (el.style.display === 'none') {
+    el.style.display = 'block';
+    btn.textContent = '▼ 원문 텍스트 숨기기';
+  } else {
+    el.style.display = 'none';
+    btn.textContent = '▶ 원문 텍스트 보기';
+  }
 }
 
 function setFoodsMissing(value) {
@@ -1900,19 +1950,35 @@ setInterval(loadDashboard, 60000);
       </div>
       <div>
         <div class="modal-label">단백질 (%)</div>
-        <input class="modal-input" id="fc-protein" type="number" placeholder="예) 32">
+        <input class="modal-input" id="fc-protein" type="number" step="any" placeholder="예) 32">
       </div>
       <div>
         <div class="modal-label">지방 (%)</div>
-        <input class="modal-input" id="fc-fat" type="number" placeholder="예) 14">
+        <input class="modal-input" id="fc-fat" type="number" step="any" placeholder="예) 14">
       </div>
       <div>
         <div class="modal-label">섬유질 (%)</div>
-        <input class="modal-input" id="fc-fiber" type="number" placeholder="예) 2.5">
+        <input class="modal-input" id="fc-fiber" type="number" step="any" placeholder="예) 2.5">
       </div>
       <div>
         <div class="modal-label">수분 (%)</div>
-        <input class="modal-input" id="fc-moisture" type="number" placeholder="예) 8">
+        <input class="modal-input" id="fc-moisture" type="number" step="any" placeholder="예) 8">
+      </div>
+      <div>
+        <div class="modal-label">조회분 (%)</div>
+        <input class="modal-input" id="fc-ash" type="number" step="any" placeholder="예) 2.5">
+      </div>
+      <div>
+        <div class="modal-label">인 (%)</div>
+        <input class="modal-input" id="fc-phosphorus" type="number" step="any" placeholder="예) 0.5">
+      </div>
+      <div>
+        <div class="modal-label">칼슘 (%)</div>
+        <input class="modal-input" id="fc-calcium" type="number" step="any" placeholder="예) 0.6">
+      </div>
+      <div>
+        <div class="modal-label">칼로리 (kcal/100g)</div>
+        <input class="modal-input" id="fc-calories" type="number" step="any" placeholder="예) 370">
       </div>
     </div>
     <div>
@@ -2004,23 +2070,111 @@ setInterval(loadDashboard, 60000);
       </div>
       <div>
         <div class="modal-label">단백질</div>
-        <input class="modal-input" id="fd-protein" readonly>
+        <div style="display:flex;align-items:center;gap:4px">
+          <input class="modal-input" id="fd-protein" readonly style="flex:1;min-width:0">
+          <span style="font-size:12px;color:#6B7570;flex-shrink:0">%</span>
+          <select id="fd-protein-op" disabled style="border:1px solid #EBF2EE;background:#F3F4F3;border-radius:6px;font-size:11px;padding:3px 5px;color:#9CA8A1;flex-shrink:0;outline:none;cursor:default">
+            <option value="">—</option>
+            <option value="이하">이하</option>
+            <option value="이상">이상</option>
+          </select>
+        </div>
       </div>
       <div>
         <div class="modal-label">지방</div>
-        <input class="modal-input" id="fd-fat" readonly>
+        <div style="display:flex;align-items:center;gap:4px">
+          <input class="modal-input" id="fd-fat" readonly style="flex:1;min-width:0">
+          <span style="font-size:12px;color:#6B7570;flex-shrink:0">%</span>
+          <select id="fd-fat-op" disabled style="border:1px solid #EBF2EE;background:#F3F4F3;border-radius:6px;font-size:11px;padding:3px 5px;color:#9CA8A1;flex-shrink:0;outline:none;cursor:default">
+            <option value="">—</option>
+            <option value="이하">이하</option>
+            <option value="이상">이상</option>
+          </select>
+        </div>
       </div>
       <div>
         <div class="modal-label">섬유질</div>
-        <input class="modal-input" id="fd-fiber" readonly>
+        <div style="display:flex;align-items:center;gap:4px">
+          <input class="modal-input" id="fd-fiber" readonly style="flex:1;min-width:0">
+          <span style="font-size:12px;color:#6B7570;flex-shrink:0">%</span>
+          <select id="fd-fiber-op" disabled style="border:1px solid #EBF2EE;background:#F3F4F3;border-radius:6px;font-size:11px;padding:3px 5px;color:#9CA8A1;flex-shrink:0;outline:none;cursor:default">
+            <option value="">—</option>
+            <option value="이하">이하</option>
+            <option value="이상">이상</option>
+          </select>
+        </div>
       </div>
       <div>
         <div class="modal-label">수분</div>
-        <input class="modal-input" id="fd-moisture" readonly>
+        <div style="display:flex;align-items:center;gap:4px">
+          <input class="modal-input" id="fd-moisture" readonly style="flex:1;min-width:0">
+          <span style="font-size:12px;color:#6B7570;flex-shrink:0">%</span>
+          <select id="fd-moisture-op" disabled style="border:1px solid #EBF2EE;background:#F3F4F3;border-radius:6px;font-size:11px;padding:3px 5px;color:#9CA8A1;flex-shrink:0;outline:none;cursor:default">
+            <option value="">—</option>
+            <option value="이하">이하</option>
+            <option value="이상">이상</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <div class="modal-label">조회분</div>
+        <div style="display:flex;align-items:center;gap:4px">
+          <input class="modal-input" id="fd-ash" readonly style="flex:1;min-width:0">
+          <span style="font-size:12px;color:#6B7570;flex-shrink:0">%</span>
+          <select id="fd-ash-op" disabled style="border:1px solid #EBF2EE;background:#F3F4F3;border-radius:6px;font-size:11px;padding:3px 5px;color:#9CA8A1;flex-shrink:0;outline:none;cursor:default">
+            <option value="">—</option>
+            <option value="이하">이하</option>
+            <option value="이상">이상</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <div class="modal-label">인</div>
+        <div style="display:flex;align-items:center;gap:4px">
+          <input class="modal-input" id="fd-phosphorus" readonly style="flex:1;min-width:0">
+          <span style="font-size:12px;color:#6B7570;flex-shrink:0">%</span>
+          <select id="fd-phosphorus-op" disabled style="border:1px solid #EBF2EE;background:#F3F4F3;border-radius:6px;font-size:11px;padding:3px 5px;color:#9CA8A1;flex-shrink:0;outline:none;cursor:default">
+            <option value="">—</option>
+            <option value="이하">이하</option>
+            <option value="이상">이상</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <div class="modal-label">칼슘</div>
+        <div style="display:flex;align-items:center;gap:4px">
+          <input class="modal-input" id="fd-calcium" readonly style="flex:1;min-width:0">
+          <span style="font-size:12px;color:#6B7570;flex-shrink:0">%</span>
+          <select id="fd-calcium-op" disabled style="border:1px solid #EBF2EE;background:#F3F4F3;border-radius:6px;font-size:11px;padding:3px 5px;color:#9CA8A1;flex-shrink:0;outline:none;cursor:default">
+            <option value="">—</option>
+            <option value="이하">이하</option>
+            <option value="이상">이상</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <div class="modal-label">칼로리</div>
+        <div style="display:flex;align-items:center;gap:4px">
+          <input class="modal-input" id="fd-calories" readonly style="flex:1;min-width:0">
+          <span style="font-size:12px;color:#6B7570;flex-shrink:0">kcal/100g</span>
+        </div>
       </div>
     </div>
+    <!-- 기타 영양성분 -->
+    <div id="fd-extra-nutrients-wrap" style="display:none;margin-top:10px">
+      <div class="modal-label" style="margin-bottom:4px">기타 영양성분</div>
+      <div id="fd-extra-nutrients" style="font-size:12px;color:#3B4740;line-height:1.9;padding:8px 12px;background:#FAFAF7;border-radius:8px;border:1px solid #EBF2EE"></div>
+    </div>
     <div>
-      <div class="modal-label">원재료 (전체 텍스트)</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <div class="modal-label" style="margin-bottom:0">원재료 (전체 텍스트)</div>
+        <button id="fd-sync-ing-btn" class="btn-sm btn-outline" onclick="syncFoodIngredientsText()" title="food_ingredients 테이블 기준으로 원재료 텍스트 재생성">📝 원재료 텍스트 동기화</button>
+      </div>
+      <!-- 원문 텍스트 (접기/펼치기) -->
+      <div id="fd-ing-raw-wrap" style="margin-bottom:6px">
+        <button id="fd-ing-raw-toggle" onclick="toggleIngRaw()" style="font-size:11px;color:#6B7570;background:none;border:none;cursor:pointer;padding:0;margin-bottom:2px">▶ 원문 텍스트 보기</button>
+        <div id="fd-ing-raw" style="display:none;font-size:11px;color:#6B7570;line-height:1.7;padding:8px 12px;background:#F5F5F2;border-radius:8px;border:1px solid #EBF2EE;margin-top:4px;word-break:break-all;white-space:pre-wrap"></div>
+      </div>
       <textarea id="fd-ingredients" style="display:none"></textarea>
       <!-- readonly view -->
       <div id="fd-ing-view" style="font-size:12px;color:#1A1F1C;line-height:1.8;min-height:40px;padding:8px 12px;background:#FAFAF7;border-radius:8px;border:1px solid #EBF2EE"></div>
@@ -2241,7 +2395,7 @@ let brandEditMode = false;
 
 // ── 상품 등록 ─────────────────────────────────────────────────
 function openFoodCreateModal() {
-  ['fc-brand','fc-name','fc-barcode','fc-protein','fc-fat','fc-fiber','fc-moisture','fc-ingredients'].forEach(id => {
+  ['fc-brand','fc-name','fc-barcode','fc-protein','fc-fat','fc-fiber','fc-moisture','fc-ash','fc-phosphorus','fc-calcium','fc-calories','fc-ingredients'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
@@ -2275,10 +2429,14 @@ async function saveFoodCreate() {
     target_species: document.getElementById('fc-species').value,
     target_age: document.getElementById('fc-age').value,
     barcode: document.getElementById('fc-barcode').value.trim() || null,
-    protein: parseFloat(document.getElementById('fc-protein').value) || null,
-    fat: parseFloat(document.getElementById('fc-fat').value) || null,
-    fiber: parseFloat(document.getElementById('fc-fiber').value) || null,
-    moisture: parseFloat(document.getElementById('fc-moisture').value) || null,
+    protein: (v => isNaN(v) ? null : v)(parseFloat(document.getElementById('fc-protein').value)),
+    fat: (v => isNaN(v) ? null : v)(parseFloat(document.getElementById('fc-fat').value)),
+    fiber: (v => isNaN(v) ? null : v)(parseFloat(document.getElementById('fc-fiber').value)),
+    moisture: (v => isNaN(v) ? null : v)(parseFloat(document.getElementById('fc-moisture').value)),
+    ash: (v => isNaN(v) ? null : v)(parseFloat(document.getElementById('fc-ash').value)),
+    phosphorus: (v => isNaN(v) ? null : v)(parseFloat(document.getElementById('fc-phosphorus').value)),
+    calcium: (v => isNaN(v) ? null : v)(parseFloat(document.getElementById('fc-calcium').value)),
+    calories_per_100g: (v => isNaN(v) ? null : v)(parseFloat(document.getElementById('fc-calories').value)),
     ingredients: document.getElementById('fc-ingredients').value.trim() || null,
     main_ingredients: ingredientTags.length ? ingredientTags.map(t => ({ name: t.name, pct: t.pct })) : null,
     is_grain_free: document.getElementById('fc-grain-free').checked,
@@ -2321,11 +2479,37 @@ async function openFoodDetail(foodId) {
     document.getElementById('fd-species').value = f.target_species === 'dog' ? '강아지' : f.target_species === 'cat' ? '고양이' : '공통';
     document.getElementById('fd-barcode').value = f.barcode || '';
     document.getElementById('fd-grain-free').value = f.is_grain_free ? '✓ 그레인프리' : '–';
-    document.getElementById('fd-protein').value = f.protein != null ? f.protein + '%' : '';
-    document.getElementById('fd-fat').value = f.fat != null ? f.fat + '%' : '';
-    document.getElementById('fd-fiber').value = f.fiber != null ? f.fiber + '%' : '';
-    document.getElementById('fd-moisture').value = f.moisture != null ? f.moisture + '%' : '';
+    const _fmtN = v => v != null ? +parseFloat(v).toFixed(4) : '';
+    document.getElementById('fd-protein').value = _fmtN(f.protein);
+    document.getElementById('fd-fat').value = _fmtN(f.fat);
+    document.getElementById('fd-fiber').value = _fmtN(f.fiber);
+    document.getElementById('fd-moisture').value = _fmtN(f.moisture);
+    document.getElementById('fd-ash').value = _fmtN(f.ash);
+    document.getElementById('fd-phosphorus').value = _fmtN(f.phosphorus);
+    document.getElementById('fd-calcium').value = _fmtN(f.calcium);
+    document.getElementById('fd-calories').value = _fmtN(f.calories_per_100g);
+    const _ops = f.nutrient_operators || {};
+    ['protein','fat','fiber','moisture','ash','phosphorus','calcium'].forEach(k => {
+      const el = document.getElementById(`fd-${k}-op`);
+      if (el) el.value = _ops[k] || '';
+    });
+    // 기타 영양성분
+    const _extraWrap = document.getElementById('fd-extra-nutrients-wrap');
+    const _extraEl = document.getElementById('fd-extra-nutrients');
+    if (f.extra_nutrients && Object.keys(f.extra_nutrients).length > 0) {
+      _extraEl.textContent = Object.entries(f.extra_nutrients)
+        .map(([n, v]) => `${n}: ${v?.value != null ? v.value + (v.unit ?? '') + (v.operator ? ' ' + v.operator : '') : '—'}`)
+        .join(' / ');
+      _extraWrap.style.display = 'block';
+    } else {
+      _extraWrap.style.display = 'none';
+    }
     document.getElementById('fd-ingredients').value = f.ingredients || '';
+    // 원문 텍스트 표시 초기화 (항상 접힌 상태로)
+    const _rawEl = document.getElementById('fd-ing-raw');
+    const _rawToggle = document.getElementById('fd-ing-raw-toggle');
+    if (_rawEl) { _rawEl.textContent = f.ingredients || '(없음)'; _rawEl.style.display = 'none'; }
+    if (_rawToggle) _rawToggle.textContent = '▶ 원문 텍스트 보기';
     // food_ingredients 조인 데이터: structured_ingredients를 order_idx 순으로 정렬 (main_ingredients 미사용)
     _fdJunctionItems = f.structured_ingredients?.length ? f.structured_ingredients : null;
     fdIngredientTags = (f.structured_ingredients ?? [])
@@ -2357,9 +2541,17 @@ function closeFoodDetailModal() {
   currentFoodId = null;
 }
 function setFoodReadonly(readonly) {
-  ['fd-name','fd-barcode','fd-protein','fd-fat','fd-fiber','fd-moisture'].forEach(id => {
+  ['fd-name','fd-barcode','fd-protein','fd-fat','fd-fiber','fd-moisture','fd-ash','fd-phosphorus','fd-calcium','fd-calories'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.readOnly = readonly;
+  });
+  ['fd-protein-op','fd-fat-op','fd-fiber-op','fd-moisture-op','fd-ash-op','fd-phosphorus-op','fd-calcium-op'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.disabled = readonly;
+    el.style.background = readonly ? '#F3F4F3' : '#FAFAF7';
+    el.style.color = readonly ? '#9CA8A1' : '#1A1F1C';
+    el.style.cursor = readonly ? 'default' : 'pointer';
   });
   // brand
   document.getElementById('fd-brand-view').style.display = readonly ? 'flex' : 'none';
@@ -2606,9 +2798,16 @@ function renderFdIngTags() {
         style="border:1px solid #EBF2EE;background:#FAFAF7;border-radius:6px;font-size:11px;padding:3px 4px;color:#1A1F1C;flex-shrink:0;cursor:pointer;outline:none">
         <option value="" ${!t.unit?'selected':''}>단위</option>
         <option value="mg" ${t.unit==='mg'?'selected':''}>mg</option>
-        <option value="IU" ${t.unit==='IU'?'selected':''}>IU</option>
         <option value="g" ${t.unit==='g'?'selected':''}>g</option>
+        <option value="IU" ${t.unit==='IU'?'selected':''}>IU</option>
         <option value="mcg" ${t.unit==='mcg'?'selected':''}>mcg</option>
+        <option value="mg/kg" ${t.unit==='mg/kg'?'selected':''}>mg/kg</option>
+        <option value="IU/kg" ${t.unit==='IU/kg'?'selected':''}>IU/kg</option>
+        <option value="CFU/kg" ${t.unit==='CFU/kg'?'selected':''}>CFU/kg</option>
+        <option value="CFU/g" ${t.unit==='CFU/g'?'selected':''}>CFU/g</option>
+        <option value="CFU" ${t.unit==='CFU'?'selected':''}>CFU</option>
+        <option value="g/kg" ${t.unit==='g/kg'?'selected':''}>g/kg</option>
+        <option value="mg/mL" ${t.unit==='mg/mL'?'selected':''}>mg/mL</option>
       </select>
       <span onclick="removeFdIngTag(${idx})"
         style="cursor:pointer;color:#C2C9C5;font-size:18px;line-height:1;flex-shrink:0;padding:0 2px"
@@ -2713,23 +2912,37 @@ function handleFdIngKeydown(e) {
 }
 async function saveFoodEdit() {
   if (!currentFoodId) return;
-  const protein = document.getElementById('fd-protein').value.replace('%','').trim();
-  const fat = document.getElementById('fd-fat').value.replace('%','').trim();
-  const fiber = document.getElementById('fd-fiber').value.replace('%','').trim();
-  const moisture = document.getElementById('fd-moisture').value.replace('%','').trim();
+  const protein = document.getElementById('fd-protein').value.trim();
+  const fat = document.getElementById('fd-fat').value.trim();
+  const fiber = document.getElementById('fd-fiber').value.trim();
+  const moisture = document.getElementById('fd-moisture').value.trim();
+  const ash = document.getElementById('fd-ash').value.trim();
+  const phosphorus = document.getElementById('fd-phosphorus').value.trim();
+  const calcium = document.getElementById('fd-calcium').value.trim();
+  const calories = document.getElementById('fd-calories').value.trim();
   const brandId = document.getElementById('fd-brand').value.trim() || null;
+  const _nutrientOps = {};
+  ['protein','fat','fiber','moisture','ash','phosphorus','calcium'].forEach(k => {
+    const v = document.getElementById(`fd-${k}-op`)?.value;
+    if (v) _nutrientOps[k] = v;
+  });
   const body = {
     brand_id: brandId,
     brand: _currentFdBrandName || null,  // 레거시 필드도 동기화
     name: document.getElementById('fd-name').value.trim(),
     barcode: document.getElementById('fd-barcode').value.trim() || null,
-    protein: parseFloat(protein) || null,
-    fat: parseFloat(fat) || null,
-    fiber: parseFloat(fiber) || null,
-    moisture: parseFloat(moisture) || null,
+    protein: (v => isNaN(v) ? null : v)(parseFloat(protein)),
+    fat: (v => isNaN(v) ? null : v)(parseFloat(fat)),
+    fiber: (v => isNaN(v) ? null : v)(parseFloat(fiber)),
+    moisture: (v => isNaN(v) ? null : v)(parseFloat(moisture)),
+    ash: (v => isNaN(v) ? null : v)(parseFloat(ash)),
+    phosphorus: (v => isNaN(v) ? null : v)(parseFloat(phosphorus)),
+    calcium: (v => isNaN(v) ? null : v)(parseFloat(calcium)),
+    calories_per_100g: (v => isNaN(v) ? null : v)(parseFloat(calories)),
     ingredients: document.getElementById('fd-ingredients').value.trim() || null,
     // main_ingredients를 현재 편집 태그 기준으로 동기화 (연결 카운트 정확성 보장)
     main_ingredients: fdIngTags.length ? fdIngTags.map(t => ({ name: t.name, pct: t.pct ?? null })) : null,
+    nutrient_operators: Object.keys(_nutrientOps).length ? _nutrientOps : null,
   };
   try {
     // 1. 기본 정보 저장
@@ -3510,12 +3723,13 @@ async function importIngredientsFromFoods() {
   } catch { toast('임포트 실패', 'red'); }
 }
 async function cleanupOrphanIngredients() {
-  if (!confirm('ingredients에 없는 원재료가 연결된 상품에서 모두 제거됩니다. 계속할까요?')) return;
+  if (!confirm('어떤 상품에도 연결되지 않은 원재료를 삭제합니다.\n되돌릴 수 없어요. 계속할까요?')) return;
   try {
     const r = await fetch(`${API}/admin/ingredients/cleanup-orphans`, { method: 'POST' });
     if (!r.ok) { toast('정리 실패', 'red'); return; }
     const d = await r.json();
-    toast(`food_ingredients ${d.deleted_count}행 삭제, 영향받은 상품 ${d.affected_foods.length}개`);
+    toast(`고아 원재료 ${d.deleted_count.toLocaleString()}개 삭제 완료`);
+    allIngredients = [];
     loadIngredients(1);
   } catch { toast('오류 발생', 'red'); }
 }
@@ -3804,27 +4018,70 @@ async function deleteIngredient(id, name, foodCount) {
 
 // ── 함량 정리 도우미 ─────────────────────────────────────────
 let cleanupItems = [];
+let cleanupPage = 0;
+const CLEANUP_PAGE_SIZE = 30;
+
+/** 과학적 표기법 포함 숫자 문자열 → float */
+function _parseSciNum(s) {
+  let m;
+  // 1×10^9, 3x10^9, 1×10^9
+  m = s.match(/^(\d+(?:[.,]\d+)?)\s*[xX×]\s*10\s*\^?\s*(\d+)$/);
+  if (m) return parseFloat(m[1].replace(',', '.')) * Math.pow(10, parseInt(m[2]));
+  // 8.33E+07, 1.5e-3
+  m = s.match(/^(\d+(?:[.,]\d+)?)[eE]([+\-]?\d+)$/);
+  if (m) return parseFloat(m[1].replace(',', '.')) * Math.pow(10, parseInt(m[2]));
+  return parseFloat(s.replace(',', '.'));
+}
 
 /**
- * 원재료 이름에서 % 함량을 파싱합니다.
+ * 원재료 이름에서 % 함량 또는 단위 함량을 파싱합니다.
  * 지원 형식:
- *   "닭고기(25%)"  / "닭고기 (25%)"  → { cleanName:'닭고기', pct:25 }
- *   "황태 100%"                       → { cleanName:'황태',   pct:100 }
- *   "0.04% 로즈마리"                  → { cleanName:'로즈마리', pct:0.04 }
- * 반환: { cleanName, pct } 또는 null
+ *   "닭고기(25%)"              → { cleanName:'닭고기', pct:25,   amount:null, unit:null }
+ *   "황태 100%"                → { cleanName:'황태',   pct:100,  amount:null, unit:null }
+ *   "0.04% 로즈마리"           → { cleanName:'로즈마리', pct:0.04, amount:null, unit:null }
+ *   "타우린 500mg/kg"          → { cleanName:'타우린',  pct:null, amount:500,  unit:'mg/kg' }
+ *   "비타민A 15700IU/kg"       → { cleanName:'비타민A', pct:null, amount:15700,unit:'IU/kg' }
+ *   "프로바이오틱스 1×10^9 CFU/kg" → { cleanName:'프로바이오틱스', pct:null, amount:1e9, unit:'CFU/kg' }
+ *   ug 단위는 mcg로 정규화.
+ * 반환: { cleanName, pct, amount, unit } 또는 null
  */
 function parsePctName(name) {
-  if (!name || !name.includes('%')) return null;
-  let m;
-  // 이름(XX%) 또는 이름 (XX%)
-  m = name.match(/^(.+?)\s*\((\d+(?:\.\d+)?)%\)\s*$/);
-  if (m) return { cleanName: m[1].trim(), pct: parseFloat(m[2]) };
-  // 이름 XX%  (이름과 숫자 사이 공백 필수)
-  m = name.match(/^(.+?)\s+(\d+(?:\.\d+)?)\s*%\s*$/);
-  if (m) return { cleanName: m[1].trim(), pct: parseFloat(m[2]) };
-  // XX% 이름
-  m = name.match(/^\s*(\d+(?:\.\d+)?)\s*%\s+(.+?)\s*$/);
-  if (m) return { cleanName: m[2].trim(), pct: parseFloat(m[1]) };
+  if (!name) return null;
+
+  // ── % 패턴 ──────────────────────────────────────────────────
+  if (name.includes('%')) {
+    let m;
+    // 이름(XX%) 또는 이름 (XX%)
+    m = name.match(/^(.+?)\s*\((\d+(?:\.\d+)?)%\)\s*$/);
+    if (m) return { cleanName: m[1].trim(), pct: parseFloat(m[2]), amount: null, unit: null };
+    // 이름 XX%  (이름과 숫자 사이 공백 필수)
+    m = name.match(/^(.+?)\s+(\d+(?:\.\d+)?)\s*%\s*$/);
+    if (m) return { cleanName: m[1].trim(), pct: parseFloat(m[2]), amount: null, unit: null };
+    // XX% 이름
+    m = name.match(/^\s*(\d+(?:\.\d+)?)\s*%\s+(.+?)\s*$/);
+    if (m) return { cleanName: m[2].trim(), pct: parseFloat(m[1]), amount: null, unit: null };
+  }
+
+  // ── 단위 패턴 (긴 단위 먼저 매칭) ───────────────────────────
+  // [원본패턴, 정규화된 단위]
+  const UNITS = [
+    ['mg\\/kg', 'mg/kg'], ['mg\\/mL', 'mg/mL'], ['mg\\/ml', 'mg/mL'],
+    ['IU\\/kg', 'IU/kg'], ['CFU\\/kg', 'CFU/kg'], ['CFU\\/g', 'CFU/g'],
+    ['g\\/kg',  'g/kg'],  ['mcg', 'mcg'],          ['ug', 'mcg'],
+    ['mg',  'mg'],        ['IU',  'IU'],            ['CFU', 'CFU'],
+    ['g',   'g'],
+  ];
+  // 숫자: 정수/소수 + 선택적 과학표기법
+  const NUM = String.raw`\d+(?:[.,]\d+)?(?:\s*[xX×]\s*10\s*\^?\s*\d+|\s*[eE][+\-]?\d+)?`;
+  for (const [unitPat, unitNorm] of UNITS) {
+    const re = new RegExp(`^(.+?)\\s+(${NUM})\\s*${unitPat}\\s*$`, 'i');
+    const m = name.match(re);
+    if (m) {
+      const amount = _parseSciNum(m[2].replace(/\s+/g, ''));
+      return { cleanName: m[1].trim(), pct: null, amount, unit: unitNorm };
+    }
+  }
+
   return null;
 }
 
@@ -3838,11 +4095,11 @@ async function loadCleanupList() {
   }
 
   cleanupItems = allIngredients
-    .filter(i => i.name.includes('%'))
+    .filter(i => parsePctName(i.name) !== null)
     .map(i => {
       const parsed = parsePctName(i.name);
       if (!parsed) return null;
-      const { cleanName, pct } = parsed;
+      const { cleanName, pct, amount, unit } = parsed;
       const dupItem = allIngredients.find(x => x.id !== i.id && x.name === cleanName);
       const isDuplicate = !!dupItem;
       const duplicateId = dupItem?.id ?? null;
@@ -3862,13 +4119,14 @@ async function loadCleanupList() {
         // main_ingredients가 없으면 ingredients 텍스트에서 탐색
         return f.ingredients ? f.ingredients.includes(i.name) : false;
       });
-      return { id: i.id, name: i.name, cleanName, pct, isDuplicate, duplicateId, affectedFoods };
+      return { id: i.id, name: i.name, cleanName, pct, amount, unit, isDuplicate, duplicateId, affectedFoods };
     })
     .filter(Boolean);
 
   const totalAffected = new Set(cleanupItems.flatMap(c => c.affectedFoods.map(f => f.id))).size;
-  document.getElementById('cleanup-count').textContent =
-    `${cleanupItems.length}개 발견 (상품 ${totalAffected}개 영향)`;
+  const countText = `총 ${cleanupItems.length.toLocaleString()}개 함량 포함 원재료 발견 (상품 ${totalAffected}개 영향)`;
+  document.getElementById('cleanup-count').textContent = countText;
+  cleanupPage = 0;
   renderCleanupList();
 }
 
@@ -3878,17 +4136,34 @@ function renderCleanupList() {
   if (!cleanupItems.length) {
     list.style.display = 'none';
     document.getElementById('cleanup-desc').style.display = '';
+    document.getElementById('cleanup-count').textContent = '';
     return;
   }
   list.style.display = '';
   document.getElementById('cleanup-desc').style.display = 'none';
-  tbody.innerHTML = cleanupItems.map(item => {
+
+  const totalPages = Math.ceil(cleanupItems.length / CLEANUP_PAGE_SIZE);
+  if (cleanupPage >= totalPages) cleanupPage = Math.max(0, totalPages - 1);
+  const start = cleanupPage * CLEANUP_PAGE_SIZE;
+  const pageItems = cleanupItems.slice(start, start + CLEANUP_PAGE_SIZE);
+
+  // 상단 카운트 레이블
+  const totalAffected = new Set(cleanupItems.flatMap(c => c.affectedFoods.map(f => f.id))).size;
+  document.getElementById('cleanup-count').textContent =
+    `총 ${cleanupItems.length.toLocaleString()}개 함량 포함 원재료 발견 (상품 ${totalAffected}개 영향)`;
+  document.getElementById('cleanup-total-label').textContent =
+    `총 ${cleanupItems.length.toLocaleString()}개 · ${cleanupPage + 1} / ${totalPages} 페이지`;
+
+  tbody.innerHTML = pageItems.map(item => {
+    const valueTag = item.pct !== null
+      ? `<span class="badge badge-green" style="margin-left:6px">${item.pct}%</span>`
+      : `<span style="margin-left:6px;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700;background:#E8F0FE;color:#3B5BDB">${item.amount} ${item.unit}</span>`;
     return `
     <tr id="cleanup-row-${item.id}">
       <td style="font-weight:600">${item.name}</td>
       <td>
         <span style="font-weight:600">${item.cleanName}</span>
-        <span class="badge badge-green" style="margin-left:6px">${item.pct}%</span>
+        ${valueTag}
       </td>
       <td>
         ${item.isDuplicate
@@ -3905,6 +4180,27 @@ function renderCleanupList() {
       </td>
     </tr>`;
   }).join('');
+
+  // 페이지네이션
+  const pag = document.getElementById('cleanup-pagination');
+  if (totalPages <= 1) { pag.innerHTML = ''; return; }
+  pag.innerHTML = `
+    <span style="font-size:12px;color:#6B7570">${cleanupPage + 1} / ${totalPages} 페이지 (총 ${cleanupItems.length.toLocaleString()}개)</span>
+    <div style="display:flex;gap:4px;align-items:center">
+      <button class="page-btn" onclick="goCleanupPage(${cleanupPage - 1})" ${cleanupPage <= 0 ? 'disabled' : ''}>‹ 이전</button>
+      <button class="page-btn" onclick="goCleanupPage(${cleanupPage + 1})" ${cleanupPage >= totalPages - 1 ? 'disabled' : ''}>다음 ›</button>
+    </div>`;
+}
+
+function goCleanupPage(page) {
+  const totalPages = Math.ceil(cleanupItems.length / CLEANUP_PAGE_SIZE);
+  cleanupPage = Math.max(0, Math.min(page, totalPages - 1));
+  renderCleanupList();
+}
+
+async function reloadCleanupList() {
+  allIngredients = [];
+  await loadCleanupList();
 }
 
 function applyCleanupById(id) {
@@ -3943,7 +4239,7 @@ async function applyCleanup(item) {
       const r = await fetch(`${API}/admin/ingredients/${item.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: item.cleanName, pct: item.pct ?? null }),
+        body: JSON.stringify({ name: item.cleanName, pct: item.pct ?? null, amount: item.amount ?? null, unit: item.unit ?? null }),
       });
       if (!r.ok) { toast('정리 실패', 'red'); return; }
       const resp = await r.json();
@@ -3957,7 +4253,7 @@ async function applyCleanup(item) {
       const r = await fetch(`${API}/admin/ingredients/${item.id}/merge`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ merge_into_id: item.duplicateId, pct: item.pct ?? null }),
+        body: JSON.stringify({ merge_into_id: item.duplicateId, pct: item.pct ?? null, amount: item.amount ?? null, unit: item.unit ?? null }),
       });
       if (!r.ok) {
         let errDetail = '';
@@ -3980,10 +4276,14 @@ async function applyCleanup(item) {
       });
     }
     cleanupItems = cleanupItems.filter(x => x.id !== item.id);
-    const totalAffected = new Set(cleanupItems.flatMap(c => c.affectedFoods.map(f => f.id))).size;
-    document.getElementById('cleanup-count').textContent =
-      `${cleanupItems.length}개 발견 (상품 ${totalAffected}개 영향)`;
-    renderCleanupList();
+    // allIngredients 캐시 부분 업데이트
+    if (!item.isDuplicate) {
+      const cachedIng = allIngredients.find(i => i.id === item.id);
+      if (cachedIng) cachedIng.name = item.cleanName;
+    } else {
+      allIngredients = allIngredients.filter(i => i.id !== item.id);
+    }
+    renderCleanupList();  // cleanupPage 유지 (재렌더링 시 범위 보정)
     toast(`정리 완료: ${item.cleanName} (상품 ${foodCount}개 업데이트)`);
   } catch(e) { console.error(e); toast('오류 발생', 'red'); }
 }
@@ -4003,7 +4303,7 @@ async function applyCleanupAll() {
 let dedupGroups = [];
 let dedupTabActive = 'space';
 let dedupPage = 0;
-const DEDUP_PAGE_SIZE = 20;
+const DEDUP_PAGE_SIZE = 30;
 
 const SYNONYM_MAP = [
   ['건조', '말린', '드라이'],
@@ -4078,9 +4378,24 @@ async function loadDedupList() {
   const fns = { space: groupBySpace, special: groupBySpecial, synonym: groupBySynonym };
   dedupGroups = fns[dedupTabActive](allIngredients);
   dedupPage = 0;
-  document.getElementById('dedup-count').textContent = `${dedupGroups.length}개 그룹 발견`;
+  _updateDedupCount();
   document.getElementById('dedup-list').style.display = 'block';
   renderDedupList();
+}
+
+function _updateDedupCount() {
+  const totalPages = Math.ceil(dedupGroups.length / DEDUP_PAGE_SIZE);
+  const text = `총 ${dedupGroups.length.toLocaleString()}개 그룹 발견`;
+  document.getElementById('dedup-count').textContent = text;
+  const tabCountEl = document.getElementById('dedup-tab-count');
+  if (tabCountEl) tabCountEl.textContent = dedupGroups.length
+    ? `${text} · ${dedupPage + 1} / ${totalPages} 페이지`
+    : text;
+}
+
+async function reloadDedupList() {
+  allIngredients = [];
+  await loadDedupList();
 }
 
 function renderDedupList() {
@@ -4121,16 +4436,16 @@ function renderDedupList() {
 }
 
 function renderDedupPagination() {
-  const total = dedupGroups.length;
-  const totalPages = Math.ceil(total / DEDUP_PAGE_SIZE);
+  const totalPages = Math.ceil(dedupGroups.length / DEDUP_PAGE_SIZE);
   const container = document.getElementById('dedup-pagination');
+  _updateDedupCount();
   if (totalPages <= 1) { container.innerHTML = ''; return; }
-  let html = '';
-  for (let i = 0; i < totalPages; i++) {
-    const active = i === dedupPage;
-    html += `<button onclick="goDedupPage(${i})" style="padding:4px 10px;border-radius:6px;border:1px solid ${active?'#4A7C59':'#EBF2EE'};background:${active?'#4A7C59':'white'};color:${active?'white':'#1A1F1C'};font-size:12px;cursor:pointer">${i+1}</button>`;
-  }
-  container.innerHTML = html;
+  container.innerHTML = `
+    <span style="font-size:12px;color:#6B7570">${dedupPage + 1} / ${totalPages} 페이지 (총 ${dedupGroups.length.toLocaleString()}개 그룹)</span>
+    <div style="display:flex;gap:4px;align-items:center">
+      <button class="page-btn" onclick="goDedupPage(${dedupPage - 1})" ${dedupPage <= 0 ? 'disabled' : ''}>‹ 이전</button>
+      <button class="page-btn" onclick="goDedupPage(${dedupPage + 1})" ${dedupPage >= totalPages - 1 ? 'disabled' : ''}>다음 ›</button>
+    </div>`;
 }
 
 function goDedupPage(page) {
@@ -4156,7 +4471,6 @@ function ignoreDedup(realIdx) {
   dedupGroups.splice(realIdx, 1);
   const maxPage = Math.max(0, Math.ceil(dedupGroups.length / DEDUP_PAGE_SIZE) - 1);
   if (dedupPage > maxPage) dedupPage = maxPage;
-  document.getElementById('dedup-count').textContent = `${dedupGroups.length}개 그룹 발견`;
   renderDedupList();
 }
 
@@ -4173,7 +4487,6 @@ async function applyDedupSelected() {
   }
   const maxPage = Math.max(0, Math.ceil(dedupGroups.length / DEDUP_PAGE_SIZE) - 1);
   if (dedupPage > maxPage) dedupPage = maxPage;
-  document.getElementById('dedup-count').textContent = `${dedupGroups.length}개 그룹 발견`;
   renderDedupList();
   toast(`선택 병합 완료 ✓`);
 }
@@ -4217,7 +4530,6 @@ async function applyDedup(groupIdx, skipRender = false) {
   if (!skipRender) {
     const maxPage = Math.max(0, Math.ceil(dedupGroups.length / DEDUP_PAGE_SIZE) - 1);
     if (dedupPage > maxPage) dedupPage = maxPage;
-    document.getElementById('dedup-count').textContent = `${dedupGroups.length}개 그룹 발견`;
     renderDedupList();
     toast(`병합 완료: ${keepItem.name}으로 통합 (상품 ${totalMergedCount}개 업데이트)`);
   }
