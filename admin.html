@@ -818,8 +818,9 @@ tr:hover td { background: #FAFAF7; }
         <button class="btn btn-outline" onclick="reloadDedupList()" style="margin-left:auto">🔄 분석 새로고침</button>
       </div>
       <div id="dedup-list" style="display:none">
-        <div style="padding:8px 16px;border-bottom:1px solid #EBF2EE;background:#FAFAF7">
+        <div style="padding:8px 16px;border-bottom:1px solid #EBF2EE;background:#FAFAF7;display:flex;align-items:center;justify-content:space-between;gap:8px">
           <span id="dedup-tab-count" style="font-size:12px;color:#6B7570"></span>
+          <button class="btn btn-outline" onclick="closeDedupList()" style="padding:4px 10px;font-size:12px" title="리스트 닫기 (또는 같은 탭 다시 클릭)">✕ 닫기</button>
         </div>
         <div class="table-wrap">
           <table>
@@ -840,6 +841,36 @@ tr:hover td { background: #FAFAF7; }
           <button class="btn btn-outline" onclick="loadDedupList()">새로고침</button>
           <button class="btn btn-outline" onclick="applyDedupSelected()">✅ 선택 병합</button>
           <button class="btn btn-red" onclick="applyDedupAll()">⚡ 전체 병합</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- alias 히스토리 -->
+    <div class="card" id="alias-history-card">
+      <div class="card-header">
+        <div class="card-title">📜 alias 변경 히스토리</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span id="alias-history-count" style="font-size:12px;color:#6B7570"></span>
+          <button class="btn btn-outline" onclick="loadAliasHistory()">불러오기 / 새로고침</button>
+        </div>
+      </div>
+      <div style="font-size:12px;color:#6B7570;padding:0 20px 12px">
+        원재료 이름 변경 · 병합 · AI 분리 시 자동 기록되는 매핑 이력. 최신순 50개.
+        rebuild 시 본 테이블의 <code>original_name</code> 으로 옛 라벨도 누락 없이 매칭됩니다.
+      </div>
+      <div id="alias-history-list" style="display:none">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>원본명 (original_name)</th>
+                <th style="width:32px;text-align:center">→</th>
+                <th>현재명 (current)</th>
+                <th style="width:160px">기록 시각</th>
+              </tr>
+            </thead>
+            <tbody id="alias-history-tbody"></tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -3655,6 +3686,58 @@ async function loadIngredients(page = 1) {
   } catch(e) { console.error(e); }
 }
 
+// ── alias 변경 히스토리 ─────────────────────────────────────────
+function _fmtAliasDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  const yy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mi = String(d.getMinutes()).padStart(2, '0');
+  return `${yy}-${mm}-${dd} ${hh}:${mi}`;
+}
+
+function _escAlias(s) {
+  if (s == null) return '';
+  return String(s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+async function loadAliasHistory() {
+  const listEl = document.getElementById('alias-history-list');
+  const tbody = document.getElementById('alias-history-tbody');
+  const countEl = document.getElementById('alias-history-count');
+  try {
+    countEl.textContent = '로딩 중...';
+    const r = await fetch(`${API}/admin/ingredients/aliases?limit=50`);
+    if (!r.ok) {
+      countEl.textContent = `오류 (${r.status})`;
+      return;
+    }
+    const items = await r.json();
+    countEl.textContent = `${items.length}건`;
+    if (!items.length) {
+      tbody.innerHTML = `<tr><td colspan="4" style="padding:16px;text-align:center;color:#C2C9C5">아직 기록된 변경 이력이 없어요.</td></tr>`;
+    } else {
+      tbody.innerHTML = items.map(a => `
+        <tr>
+          <td style="font-family:'Courier New',monospace">${_escAlias(a.original_name)}</td>
+          <td style="text-align:center;color:#4A7C59">→</td>
+          <td>${a.current_name ? _escAlias(a.current_name) : '<span style="color:#C2C9C5">(삭제됨)</span>'}</td>
+          <td style="font-size:12px;color:#6B7570">${_fmtAliasDate(a.created_at)}</td>
+        </tr>
+      `).join('');
+    }
+    listEl.style.display = 'block';
+  } catch(e) {
+    console.error(e);
+    countEl.textContent = '오류';
+  }
+}
+
 async function loadAllIngredients() {
   try {
     const r = await fetch(`${API}/admin/ingredients?limit=20000`);
@@ -4550,7 +4633,24 @@ async function applyDedupAll() {
   toast('전체 병합 완료 ✓');
 }
 
+function closeDedupList() {
+  const list = document.getElementById('dedup-list');
+  if (list) list.style.display = 'none';
+  // 탭 버튼은 시각적으로 비활성화 (다음 클릭 시 새로 열림)
+  document.querySelectorAll('.dedup-tab').forEach(btn => {
+    btn.classList.remove('btn-green');
+    btn.classList.add('btn-outline');
+  });
+}
+
 function switchDedupTab(tab) {
+  const list = document.getElementById('dedup-list');
+  const isOpen = list && list.style.display !== 'none';
+  // 같은 탭을 다시 클릭하면 닫기 토글
+  if (isOpen && dedupTabActive === tab) {
+    closeDedupList();
+    return;
+  }
   dedupTabActive = tab;
   document.querySelectorAll('.dedup-tab').forEach(btn => {
     const active = btn.dataset.tab === tab;
