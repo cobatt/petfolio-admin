@@ -852,6 +852,7 @@ tr:hover td { background: #FAFAF7; }
     <div style="display:flex;gap:8px;align-items:center">
       <span id="alias-history-count" style="font-size:12px;color:#6B7570"></span>
       <button class="btn btn-outline" onclick="loadAliasHistory(1)">불러오기 / 새로고침</button>
+      <button class="btn btn-outline" id="alias-history-close-btn" onclick="closeAliasHistory()" style="display:none">✕ 닫기</button>    
     </div>
   </div>
   <div style="font-size:12px;color:#6B7570;padding:0 20px 12px">
@@ -864,7 +865,7 @@ tr:hover td { background: #FAFAF7; }
       style="flex:1;padding:6px 10px;border:1px solid #D1D5DB;border-radius:6px;font-size:13px"
       oninput="loadAliasHistory(1)">
   </div>
-  <div id="alias-history-list">
+  <div id="alias-history-list" style="display:none">
     <div class="table-wrap">
       <table>
         <thead>
@@ -3753,6 +3754,9 @@ async function loadAliasHistory(page = 1) {
         ${hasNext ? `<button class="btn btn-outline btn-sm" onclick="loadAliasHistory(${page+1})">다음 →</button>` : ''}
       `;
     }
+
+    document.getElementById('alias-history-list').style.display = 'block';
+    document.getElementById('alias-history-close-btn').style.display = '';  
   } catch(e) {
     countEl.textContent = '오류';
     tbody.innerHTML = `<tr><td colspan="5" style="color:red;padding:20px">${e.message}</td></tr>`;
@@ -3768,6 +3772,11 @@ async function deleteAlias(id) {
   } catch(e) {
     alert('삭제 실패: ' + e.message);
   }
+}
+
+function closeAliasHistory() {
+  document.getElementById('alias-history-list').style.display = 'none';
+  document.getElementById('alias-history-close-btn').style.display = 'none';
 }
 
 async function loadAllIngredients() {
