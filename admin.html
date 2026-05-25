@@ -4061,14 +4061,6 @@ async function saveIngredientNameEdit() {
   for (const food of affected) {
     try {
       const body = {};
-      const mi = food.main_ingredients;
-      if (mi?.length) {
-        body.main_ingredients = mi.map(x =>
-          typeof x === 'string'
-            ? { name: x === oldName ? newName : x, pct: null }
-            : { ...x, name: x.name === oldName ? newName : x.name }
-        );
-      }
       if (food.ingredients?.includes(oldName)) {
         body.ingredients = food.ingredients.replace(oldNameRE, newName);
       }
@@ -4079,13 +4071,7 @@ async function saveIngredientNameEdit() {
           body: JSON.stringify(body),
         });
         const cached = allFoods.find(f => f.id === food.id);
-        if (cached) {
-          if (body.main_ingredients) cached.main_ingredients = body.main_ingredients;
-          if (body.ingredients) cached.ingredients = body.ingredients;
-        }
-        if (body.main_ingredients) {
-          await syncFoodJunctionTable(food.id, body.main_ingredients);
-        }
+        if (cached && body.ingredients) cached.ingredients = body.ingredients;
       }
     } catch(e) { console.error('food update failed:', food.id, e); }
   }
