@@ -3674,19 +3674,44 @@ async function loadAliasHistory(page = 1) {
     if (!r.ok) throw new Error(r.status);
     const items = await r.json();
 
-    countEl.textContent = items.length ? `${offset+1}–${offset+items.length}건` : '0건';
+    // split 으로 만들어진 alias 들은 (original_name, created_at 초 단위) 가 같음 →
+    // 같은 그룹으로 묶어 1 행으로 표시. 그룹 내부는 order_idx 오름차순으로 정렬.
+    const groups = new Map();
+    for (const item of items) {
+      const secKey = item.created_at
+        ? Math.floor(new Date(item.created_at).getTime() / 1000)
+        : 0;
+      const key = `${item.original_name}|${secKey}`;
+      if (!groups.has(key)) {
+        groups.set(key, { items: [], original_name: item.original_name, created_at: item.created_at });
+      }
+      groups.get(key).items.push(item);
+    }
+    const grouped = [];
+    for (const g of groups.values()) {
+      g.items.sort((a, b) => (a.order_idx ?? 0) - (b.order_idx ?? 0));
+      const names = g.items
+        .map(i => i.current_name ? _escAlias(i.current_name) : '<span style="color:#9CA3AF">(삭제됨)</span>')
+        .join(', ');
+      const ids = g.items.map(i => i.id);
+      grouped.push({ original_name: g.original_name, names, created_at: g.created_at, ids });
+    }
+
+    countEl.textContent = items.length
+      ? `${offset+1}–${offset+items.length}건 (${grouped.length} 그룹)`
+      : '0건';
 
     if (!items.length) {
       tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#9CA3AF;padding:20px">검색 결과가 없습니다.</td></tr>';
     } else {
-      tbody.innerHTML = items.map(item => `
+      tbody.innerHTML = grouped.map(g => `
         <tr>
-          <td style="font-family:monospace;font-size:12px">${_escAlias(item.original_name)}</td>
+          <td style="font-family:monospace;font-size:12px">${_escAlias(g.original_name)}</td>
           <td style="text-align:center;color:#9CA3AF">→</td>
-          <td style="font-family:monospace;font-size:12px">${item.current_name ? _escAlias(item.current_name) : '<span style="color:#9CA3AF">(삭제됨)</span>'}</td>
-          <td style="font-size:12px;color:#6B7570">${_fmtAliasDate(item.created_at)}</td>
+          <td style="font-family:monospace;font-size:12px">${g.names}</td>
+          <td style="font-size:12px;color:#6B7570">${_fmtAliasDate(g.created_at)}</td>
           <td style="text-align:center">
-            <button class="btn btn-danger btn-sm" onclick="deleteAlias('${item.id}')">삭제</button>
+            <button class="btn btn-danger btn-sm" onclick='deleteAliasGroup(${JSON.stringify(g.ids)})'>삭제</button>
           </td>
         </tr>
       `).join('');
@@ -3715,6 +3740,24 @@ async function deleteAlias(id) {
   try {
     const r = await fetch(`${API}/admin/ingredients/aliases/${id}`, { method: 'DELETE' });
     if (!r.ok) throw new Error(r.status);
+    loadAliasHistory(_aliasCurrentPage);
+  } catch(e) {
+    alert('삭제 실패: ' + e.message);
+  }
+}
+
+async function deleteAliasGroup(ids) {
+  if (!Array.isArray(ids) || !ids.length) return;
+  const msg = ids.length === 1
+    ? '이 alias 항목을 삭제하시겠습니까?\nrebuild 시 이 매핑은 더 이상 적용되지 않습니다.'
+    : `이 split alias 그룹(${ids.length}개 행)을 삭제하시겠습니까?\nrebuild 시 이 매핑은 더 이상 적용되지 않습니다.`;
+  if (!confirm(msg)) return;
+  try {
+    const results = await Promise.all(
+      ids.map(id => fetch(`${API}/admin/ingredients/aliases/${id}`, { method: 'DELETE' }))
+    );
+    const failed = results.filter(r => !r.ok);
+    if (failed.length) throw new Error(`${failed.length}건 실패`);
     loadAliasHistory(_aliasCurrentPage);
   } catch(e) {
     alert('삭제 실패: ' + e.message);
