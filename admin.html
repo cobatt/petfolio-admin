@@ -4024,10 +4024,15 @@ async function saveIngredientNameEdit() {
     } catch(e) { console.error('food update failed:', food.id, e); }
   }
 
-  // STEP 3: 병합 모드 → 기존 원재료(id) 삭제
+  // STEP 3: 병합 모드 → merge 엔드포인트로 food_ingredients 재매핑 후 삭제
+  // (plain DELETE 는 food_ingredients 를 CASCADE 로 같이 날려 원재료가 상품에서 사라짐)
   if (isMerge) {
     try {
-      await fetch(`${API}/admin/ingredients/${id}`, { method: 'DELETE' });
+      await fetch(`${API}/admin/ingredients/${id}/merge`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ merge_into_id: existingIng.id }),
+      });
     } catch(e) { console.error(e); }
     allIngredients = allIngredients.filter(i => i.id !== id);
     toast(`병합 완료 ✓ "${newName}"으로 통합 (상품 ${affected.length}개 업데이트)`);
