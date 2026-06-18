@@ -816,7 +816,7 @@ tr:hover td { background: #FAFAF7; }
     </div>
   </div>
   <div style="font-size:12px;color:#6B7570;padding:0 20px 12px">
-    원재료 이름 변경 · 병합 · AI 분리 시 자동 기록되는 매핑 이력.
+    원재료 이름 변경 · 병합 · 분리 시 자동 기록되는 매핑 이력.
     rebuild 시 <code>original_name</code> 으로 옛 라벨도 누락 없이 매칭됩니다.
     불필요한 항목은 삭제하여 rebuild 매핑에서 제외하세요.
   </div>
@@ -1004,15 +1004,15 @@ tr:hover td { background: #FAFAF7; }
   </div>
 </div>
 
-<!-- ── 원재료 AI 분리 모달 ── -->
+<!-- ── 원재료 분리 모달 ── -->
 <div class="modal-overlay" id="ingredient-split-modal">
-  <div class="modal" style="width:480px">
+  <div class="modal" style="width:520px">
     <div class="modal-title">✂️ 원재료 분리 등록</div>
     <div class="modal-label">원본 원재료명</div>
     <div id="split-original-name" style="font-size:13px;font-weight:600;color:#6B7570;padding:8px 12px;background:#FAFAF7;border-radius:8px;border:1px solid #EBF2EE;margin-bottom:12px"></div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-      <div class="modal-label" style="margin:0">분리할 원재료명 <span style="font-size:11px;color:#6B7570;font-weight:400">(순서 유지)</span></div>
-      <button class="btn-sm btn-outline" onclick="addSplitItem('')">+ 항목 추가</button>
+      <div class="modal-label" style="margin:0">분리할 원재료 <span style="font-size:11px;color:#6B7570;font-weight:400">(이름 + pct 선택, 순서 유지)</span></div>
+      <button class="btn-sm btn-outline" onclick="addSplitItem('', '')">+ 항목 추가</button>
     </div>
     <div id="split-items-container" style="display:flex;flex-direction:column;gap:6px;min-height:60px;margin-bottom:4px"></div>
     <div class="modal-footer">
@@ -3808,7 +3808,7 @@ function renderIngredientsPage() {
       <td><span class="badge ${i.is_allergen?'badge-amber':'badge-gray'}">${i.is_allergen?'알레르기':'—'}</span></td>
       <td style="display:flex;gap:4px;flex-wrap:wrap">
         <button class="btn-sm btn-outline btn-ing-edit" data-id="${i.id}" data-name="${(i.name||'').replace(/"/g,'&quot;')}">수정</button>
-        <button class="btn-sm btn-ai-split" style="background:#EEF2FF;color:#4F46E5;border:1px solid #C7D2FE;border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer" data-id="${i.id}" data-name="${(i.name||'').replace(/"/g,'&quot;')}">AI 분리</button>
+        <button class="btn-sm btn-split" style="background:#EEF2FF;color:#4F46E5;border:1px solid #C7D2FE;border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer" data-id="${i.id}" data-name="${(i.name||'').replace(/"/g,'&quot;')}">원재료 분리</button>
         <button class="btn-sm btn-red btn-ing-delete" data-id="${i.id}" data-name="${(i.name||'').replace(/"/g,'&quot;')}" data-food-count="${i.food_count||0}">삭제</button>
       </td>
     </tr>
@@ -3818,8 +3818,8 @@ function renderIngredientsPage() {
 
 // 원재료 목록 액션 버튼 — 이벤트 위임 (행마다 onclick 인라인 대신 한 번만 등록)
 document.querySelector('#ingredients-tbody')?.addEventListener('click', e => {
-  const splitBtn = e.target.closest('.btn-ai-split');
-  if (splitBtn) { openAiSplitModal(splitBtn.dataset.id, splitBtn.dataset.name); return; }
+  const splitBtn = e.target.closest('.btn-split');
+  if (splitBtn) { openSplitModal(splitBtn.dataset.id, splitBtn.dataset.name); return; }
   const editBtn = e.target.closest('.btn-ing-edit');
   if (editBtn) { openIngredientNameEdit(editBtn.dataset.id, editBtn.dataset.name); return; }
   const delBtn = e.target.closest('.btn-ing-delete');
@@ -3887,43 +3887,18 @@ async function saveIngredientCreate() {
 let _ieId = null;
 let _ieOldName = null;
 
-// ── 원재료 AI 분리 ─────────────────────────────────────────
+// ── 원재료 분리 ─────────────────────────────────────────
 let _splitIngId = null;
 let _splitIngName = null;
 
-async function openAiSplitModal(id, name) {
-  _splitIngId = id;
-  _splitIngName = name;
-  document.getElementById('split-original-name').textContent = name;
-  const container = document.getElementById('split-items-container');
-  container.innerHTML = '<div style="text-align:center;padding:16px;color:#6B7570;font-size:12px">🤖 AI 분석 중...</div>';
-  document.getElementById('ingredient-split-modal').classList.add('open');
-  try {
-    const r = await fetch(`${API}/admin/ingredients/${id}/ai-suggest-split`, { method: 'POST' });
-    container.innerHTML = '';
-    if (r.ok) {
-      const d = await r.json();
-      const names = d.suggested_names || [];
-      for (const n of names) addSplitItem(n);
-      if (names.length < 2) { addSplitItem(''); }
-    } else {
-      addSplitItem(''); addSplitItem('');
-      toast('AI 분석 실패, 직접 입력해주세요', 'red');
-    }
-  } catch(e) {
-    container.innerHTML = '';
-    addSplitItem(''); addSplitItem('');
-    toast('AI 분석 오류', 'red');
-  }
-}
-
-function openManualSplitModal(id, name) {
+function openSplitModal(id, name) {
   _splitIngId = id;
   _splitIngName = name;
   document.getElementById('split-original-name').textContent = name;
   const container = document.getElementById('split-items-container');
   container.innerHTML = '';
-  addSplitItem(''); addSplitItem('');
+  addSplitItem('', '');
+  addSplitItem('', '');
   document.getElementById('ingredient-split-modal').classList.add('open');
 }
 
@@ -3932,24 +3907,37 @@ function closeSplitModal() {
   _splitIngId = null; _splitIngName = null;
 }
 
-function addSplitItem(value = '') {
+function addSplitItem(nameVal = '', pctVal = '') {
   const container = document.getElementById('split-items-container');
   const div = document.createElement('div');
+  div.className = 'split-row';
   div.style.cssText = 'display:flex;gap:6px;align-items:center';
-  const safeVal = String(value).replace(/"/g, '&quot;');
-  div.innerHTML = `<input class="modal-input split-name-input" value="${safeVal}" placeholder="원재료명 입력..." style="margin:0;flex:1"><button class="btn-sm btn-red" onclick="this.parentElement.remove()" style="flex-shrink:0">✕</button>`;
+  const safeName = String(nameVal).replace(/"/g, '&quot;');
+  const safePct = String(pctVal).replace(/"/g, '&quot;');
+  div.innerHTML = `
+    <input class="modal-input split-name-input" value="${safeName}" placeholder="원재료명" style="margin:0;flex:1">
+    <input class="modal-input split-pct-input" type="number" min="0" step="0.01" value="${safePct}" placeholder="pct (선택)" style="margin:0;width:96px">
+    <span style="font-size:11px;color:#9CA8A1;flex-shrink:0">%</span>
+    <button class="btn-sm btn-red" onclick="this.parentElement.remove()" style="flex-shrink:0">✕</button>`;
   container.appendChild(div);
 }
 
 async function doSplitIngredient() {
-  const inputs = document.querySelectorAll('#split-items-container .split-name-input');
-  const names = Array.from(inputs).map(el => el.value.trim()).filter(Boolean);
-  if (names.length < 2) { toast('분리할 원재료를 2개 이상 입력해주세요', 'red'); return; }
+  const rows = document.querySelectorAll('#split-items-container .split-row');
+  const items = [];
+  rows.forEach(row => {
+    const name = row.querySelector('.split-name-input').value.trim();
+    if (!name) return;
+    const pctStr = row.querySelector('.split-pct-input').value.trim();
+    const pct = pctStr === '' ? null : parseFloat(pctStr);
+    items.push({ name, pct: Number.isFinite(pct) ? pct : null });
+  });
+  if (items.length < 2) { toast('분리할 원재료를 2개 이상 입력해주세요', 'red'); return; }
   if (!confirm(`"${_splitIngName}"이(가) 포함된 모든 상품에 적용됩니다. 계속할까요?`)) return;
   try {
     const r = await fetch(`${API}/admin/ingredients/${_splitIngId}/split`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ names }),
+      body: JSON.stringify({ items }),
     });
     if (!r.ok) { const e = await r.json(); toast(e.detail || '분리 실패', 'red'); return; }
     const d = await r.json();
