@@ -1022,6 +1022,43 @@ tr:hover td { background: #FAFAF7; }
   </div>
 </div>
 
+<!-- ── 그룹 분리 모달 ── -->
+<div class="modal-overlay" id="group-split-modal">
+  <div class="modal" style="width:560px">
+    <div class="modal-title">🧺 그룹 분리 등록</div>
+    <div class="modal-label">원본 원재료</div>
+    <div id="gsplit-source-name" style="font-size:13px;font-weight:600;color:#6B7570;padding:8px 12px;background:#FAFAF7;border-radius:8px;border:1px solid #EBF2EE;margin-bottom:12px"></div>
+
+    <div class="modal-label">그룹</div>
+    <select class="modal-input" id="gsplit-group-select" style="margin:0 0 6px 0" onchange="onGroupSplitGroupSelectChange()">
+      <option value="">— 신규 그룹 생성 —</option>
+    </select>
+    <input class="modal-input" id="gsplit-new-group-name" placeholder="신규 그룹명 (UNIQUE)" style="margin:0 0 12px 0">
+
+    <div style="display:flex;gap:6px;align-items:center;margin-bottom:12px">
+      <div class="modal-label" style="margin:0;flex:1">그룹 전체 함량 (선택)</div>
+      <input class="modal-input" id="gsplit-group-pct" type="number" min="0" step="0.01" placeholder="pct" style="margin:0;width:96px">
+      <span style="font-size:11px;color:#9CA8A1">%</span>
+      <select class="modal-input" id="gsplit-group-pct-op" style="margin:0;width:80px">
+        <option value="">—</option>
+        <option value="이상">이상</option>
+        <option value="이하">이하</option>
+      </select>
+    </div>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <div class="modal-label" style="margin:0">그룹 멤버 <span style="font-size:11px;color:#6B7570;font-weight:400">(이름 + pct 선택, 순서 유지)</span></div>
+      <button class="btn-sm btn-outline" onclick="addGroupSplitMember('', '')">+ 멤버 추가</button>
+    </div>
+    <div id="gsplit-members-container" style="display:flex;flex-direction:column;gap:6px;min-height:60px;margin-bottom:4px"></div>
+
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeGroupSplitModal()">취소</button>
+      <button class="btn btn-green" onclick="doGroupSplit()">그룹 분리</button>
+    </div>
+  </div>
+</div>
+
 <!-- 토스트 -->
 <div class="toast" id="toast"></div>
 
@@ -2497,11 +2534,8 @@ async function openFoodDetail(foodId) {
     const _rawToggle = document.getElementById('fd-ing-raw-toggle');
     if (_rawEl) { _rawEl.textContent = f.ingredients || '(없음)'; _rawEl.style.display = 'none'; }
     if (_rawToggle) _rawToggle.textContent = '▶ 원문 텍스트 보기';
-    // food_ingredients 조인 데이터: structured_ingredients를 order_idx 순으로 정렬 (main_ingredients 미사용)
-    _fdJunctionItems = f.structured_ingredients?.length ? f.structured_ingredients : null;
-    fdIngredientTags = (f.structured_ingredients ?? [])
-      .sort((a, b) => (a.order_idx ?? 0) - (b.order_idx ?? 0))
-      .map(i => ({ id: i.ingredient_id, name: i.ingredient_name, pct: i.pct, pct_operator: i.pct_operator ?? null, amount: i.amount ?? null, unit: i.unit ?? null }));
+    // food_ingredients 는 새 admin endpoint 에서 group 정보까지 함께 로드
+    await loadFdIngredients(foodId);
     renderFdIngTagsReadonly();
     // 이미지
     const img = document.getElementById('fd-image');
@@ -2557,6 +2591,14 @@ function setFoodReadonly(readonly) {
   if (!readonly) initFdIngTags(); else renderFdIngTagsReadonly();
 }
 function toggleFoodEdit() {
+  // 그룹이 포함된 사료는 아직 edit mode 미지원 — 진입 차단
+  if (!foodEditMode) {
+    const hasGroup = (_fdAllIngItems || []).some(it => it.group_id != null);
+    if (hasGroup) {
+      toast('그룹이 포함된 원재료는 아직 편집 모드를 지원하지 않아요. 그룹 분리/해제 후 다시 시도해주세요', 'red');
+      return;
+    }
+  }
   foodEditMode = !foodEditMode;
   setFoodReadonly(!foodEditMode);
   document.getElementById('fd-edit-btn').textContent = foodEditMode ? '취소' : '편집';
@@ -2593,7 +2635,29 @@ function clearFdBrand() {
 }
 let fdIngTags = []; // [{name, pct, ingredient_id: string|null}]
 let fdIngredientTags = []; // food_ingredients 기반 태그 [{id, name, pct}]
-let _fdJunctionItems = null; // food_ingredients API 응답 캐시
+let _fdJunctionItems = null; // food_ingredients API 응답 캐시 (edit mode 용, summary 제외)
+let _fdAllIngItems = null;   // 새 admin endpoint 응답 전체 (summary + member + plain, group 정보 포함)
+
+// 새 admin endpoint 로 사료의 food_ingredients 전체 + group 정보 로드.
+async function loadFdIngredients(foodId) {
+  try {
+    const r = await fetch(`${API}/admin/foods/${foodId}/ingredients`);
+    if (!r.ok) { _fdAllIngItems = []; _fdJunctionItems = null; fdIngredientTags = []; return; }
+    const d = await r.json();
+    const items = (d.items || []).slice().sort((a,b) => (a.order_idx ?? 0) - (b.order_idx ?? 0));
+    _fdAllIngItems = items;
+    // edit mode 캐시 — summary 행 제외 (legacy 인터페이스 유지)
+    const members = items.filter(it => !it.is_group_summary_row);
+    _fdJunctionItems = members.length ? members : null;
+    fdIngredientTags = members.map(m => ({
+      id: m.ingredient_id, name: m.ingredient_name,
+      pct: m.pct, pct_operator: m.pct_operator,
+      amount: m.amount, unit: m.unit,
+    }));
+  } catch(e) {
+    _fdAllIngItems = []; _fdJunctionItems = null; fdIngredientTags = [];
+  }
+}
 
 // 괄호 밖 쉼표만 기준으로 분리
 function splitOutsideParens(str) {
@@ -2690,23 +2754,78 @@ function initFdIngTags() {
 
 function renderFdIngTagsReadonly() {
   const el = document.getElementById('fd-ing-view');
-  // food_ingredients 기반으로만 표시 — foods.ingredients 텍스트 fallback 제거
-  if (fdIngredientTags.length > 0) {
-    el.innerHTML = fdIngredientTags.map(fi => {
-      const pctHtml = fi.pct != null
-        ? ` <span style="color:#9CA8A1;font-size:10px">${fi.pct}%${fi.pct_operator ? ' ' + fi.pct_operator : ''}</span>`
-        : '';
-      const amountHtml = (fi.amount != null && fi.unit)
-        ? ` <span style="color:#9CA8A1;font-size:10px">${fi.amount}${fi.unit}</span>`
-        : '';
-      return `<span title="원재료 DB 연결됨" style="display:inline-flex;align-items:center;gap:3px;background:#EBF2EE;color:#1A1F1C;padding:2px 8px;border-radius:12px;margin:2px 3px;font-size:11px">${fi.name}${pctHtml}${amountHtml}</span>`;
-    }).join('');
-  } else {
+  const items = (_fdAllIngItems || []).slice().sort((a,b) => (a.order_idx ?? 0) - (b.order_idx ?? 0));
+  if (!items.length) {
     el.innerHTML = '<span style="color:#C2C9C5">없음</span>';
+    el.style.display = 'block';
+    document.getElementById('fd-ing-edit').style.display = 'none';
+    return;
   }
+  // order_idx 순으로 순회하면서 group_id 가 이어지는 동안 한 묶음(바구니).
+  const chunks = [];
+  let cur = null;
+  for (const it of items) {
+    if (it.group_id == null) {
+      chunks.push({ type: 'plain', item: it });
+      cur = null;
+    } else {
+      if (!cur || cur.groupId !== it.group_id) {
+        cur = { type: 'group', groupId: it.group_id, groupName: it.group_name, summary: null, members: [] };
+        chunks.push(cur);
+      }
+      if (it.is_group_summary_row) cur.summary = it;
+      else cur.members.push(it);
+    }
+  }
+  el.innerHTML = chunks.map(c =>
+    c.type === 'plain' ? _renderFdPlainChip(c.item) : _renderFdGroupBasket(c)
+  ).join('');
   el.style.display = 'block';
   document.getElementById('fd-ing-edit').style.display = 'none';
 }
+
+function _renderFdPlainChip(fi) {
+  const name = fi.ingredient_name || '(이름 없음)';
+  const pctHtml = fi.pct != null
+    ? ` <span style="color:#9CA8A1;font-size:10px">${fi.pct}%${fi.pct_operator ? ' ' + fi.pct_operator : ''}</span>`
+    : '';
+  const amountHtml = (fi.amount != null && fi.unit)
+    ? ` <span style="color:#9CA8A1;font-size:10px">${fi.amount}${fi.unit}</span>`
+    : '';
+  const safeIngName = name.replace(/"/g, '&quot;');
+  const actionsHtml = fi.ingredient_id ? `
+    <button class="btn-fd-split" title="원재료 분리" data-ing-id="${fi.ingredient_id}" data-ing-name="${safeIngName}" style="background:none;border:none;color:#4F46E5;font-size:11px;cursor:pointer;padding:0 2px;line-height:1">✂️</button>
+    <button class="btn-fd-group-split" title="그룹 분리" data-ing-id="${fi.ingredient_id}" data-ing-name="${safeIngName}" style="background:none;border:none;color:#B45309;font-size:11px;cursor:pointer;padding:0 2px;line-height:1">🧺</button>
+  ` : '';
+  return `<span title="원재료 DB 연결됨" style="display:inline-flex;align-items:center;gap:3px;background:#EBF2EE;color:#1A1F1C;padding:2px 8px;border-radius:12px;margin:2px 3px;font-size:11px">${name}${pctHtml}${amountHtml}${actionsHtml}</span>`;
+}
+
+function _renderFdGroupBasket(g) {
+  const headerName = g.groupName || '(이름 없는 그룹)';
+  const summaryPctHtml = (g.summary && g.summary.pct != null)
+    ? ` <span style="color:#9C7530;font-size:11px;font-weight:600">${g.summary.pct}%${g.summary.pct_operator ? ' ' + g.summary.pct_operator : ''}</span>`
+    : '';
+  const sortedMembers = g.members.slice().sort((a,b) => (a.group_member_idx ?? 0) - (b.group_member_idx ?? 0));
+  const memberChips = sortedMembers.map(m => {
+    const mName = m.ingredient_name || '(이름 없음)';
+    const mPct = m.pct != null
+      ? ` <span style="color:#9CA8A1;font-size:10px">${m.pct}%${m.pct_operator ? ' ' + m.pct_operator : ''}</span>`
+      : '';
+    return `<span style="display:inline-flex;align-items:center;gap:3px;background:white;color:#1A1F1C;padding:2px 8px;border-radius:12px;margin:2px 3px;font-size:11px;border:1px solid #E5DDD0">${mName}${mPct}</span>`;
+  }).join('');
+  return `<div style="display:inline-block;background:#FAF6EE;border:1px solid #E5DDD0;border-radius:10px;padding:4px 8px;margin:2px 3px;vertical-align:top">
+    <div style="font-size:11px;font-weight:700;color:#7A5A1D;margin-bottom:2px">🧺 ${headerName}${summaryPctHtml}</div>
+    <div>${memberChips || '<span style="color:#C2C9C5;font-size:11px">멤버 없음</span>'}</div>
+  </div>`;
+}
+
+// readonly view 내부 액션 버튼 위임
+document.getElementById('fd-ing-view')?.addEventListener('click', e => {
+  const splitBtn = e.target.closest('.btn-fd-split');
+  if (splitBtn) { e.stopPropagation(); openSplitModal(splitBtn.dataset.ingId, splitBtn.dataset.ingName); return; }
+  const groupSplitBtn = e.target.closest('.btn-fd-group-split');
+  if (groupSplitBtn) { e.stopPropagation(); openGroupSplitModal(groupSplitBtn.dataset.ingId, groupSplitBtn.dataset.ingName); return; }
+});
 
 // 드래그 앤 드랍 (원재료 텍스트 태그)
 let _fdIngDragSrcIdx = null;
@@ -3953,8 +4072,138 @@ async function doSplitIngredient() {
       }
     }
     loadIngredients(ingredientsPage);
+    // food-detail 모달 안에서 호출됐으면 그 모달의 원재료도 새로고침
+    if (currentFoodId && document.getElementById('food-detail-modal').classList.contains('open')) {
+      await loadFdIngredients(currentFoodId);
+      renderFdIngTagsReadonly();
+    }
   } catch(e) { toast('오류 발생', 'red'); }
 }
+
+// ── 그룹 분리 (food-detail 컨텍스트) ────────────────────────────
+let _gsplitSrcIngId = null;
+let _gsplitSrcIngName = null;
+let _gsplitFoodId = null;
+let _gsplitGroupsCache = null;
+
+async function openGroupSplitModal(srcIngId, srcIngName) {
+  if (!currentFoodId) { toast('상품 컨텍스트가 없어요', 'red'); return; }
+  _gsplitSrcIngId = srcIngId;
+  _gsplitSrcIngName = srcIngName;
+  _gsplitFoodId = currentFoodId;
+  document.getElementById('gsplit-source-name').textContent = srcIngName;
+
+  // 그룹 드롭다운 — 첫 호출 시 캐시
+  if (!_gsplitGroupsCache) {
+    try {
+      const r = await fetch(`${API}/admin/ingredient-groups?limit=500`);
+      _gsplitGroupsCache = r.ok ? ((await r.json()).items || []) : [];
+    } catch(e) { _gsplitGroupsCache = []; }
+  }
+  const sel = document.getElementById('gsplit-group-select');
+  sel.innerHTML = '<option value="">— 신규 그룹 생성 —</option>' +
+    _gsplitGroupsCache.map(g => `<option value="${g.id}">${(g.name||'').replace(/</g,'&lt;')}</option>`).join('');
+  sel.value = '';
+  document.getElementById('gsplit-new-group-name').value = '';
+  document.getElementById('gsplit-new-group-name').style.display = 'block';
+  document.getElementById('gsplit-group-pct').value = '';
+  document.getElementById('gsplit-group-pct-op').value = '';
+
+  const container = document.getElementById('gsplit-members-container');
+  container.innerHTML = '';
+  addGroupSplitMember('', '');
+  addGroupSplitMember('', '');
+
+  document.getElementById('group-split-modal').classList.add('open');
+}
+
+function onGroupSplitGroupSelectChange() {
+  const sel = document.getElementById('gsplit-group-select');
+  const nameInput = document.getElementById('gsplit-new-group-name');
+  if (sel.value) { nameInput.style.display = 'none'; nameInput.value = ''; }
+  else { nameInput.style.display = 'block'; }
+}
+
+function closeGroupSplitModal() {
+  document.getElementById('group-split-modal').classList.remove('open');
+  _gsplitSrcIngId = null; _gsplitSrcIngName = null; _gsplitFoodId = null;
+}
+
+function addGroupSplitMember(nameVal = '', pctVal = '') {
+  const container = document.getElementById('gsplit-members-container');
+  const div = document.createElement('div');
+  div.className = 'gsplit-row';
+  div.style.cssText = 'display:flex;gap:6px;align-items:center';
+  const safeName = String(nameVal).replace(/"/g, '&quot;');
+  const safePct = String(pctVal).replace(/"/g, '&quot;');
+  div.innerHTML = `
+    <input class="modal-input gsplit-name-input" value="${safeName}" placeholder="멤버 이름" style="margin:0;flex:1">
+    <input class="modal-input gsplit-pct-input" type="number" min="0" step="0.01" value="${safePct}" placeholder="pct (선택)" style="margin:0;width:96px">
+    <span style="font-size:11px;color:#9CA8A1;flex-shrink:0">%</span>
+    <button class="btn-sm btn-red" onclick="this.parentElement.remove()" style="flex-shrink:0">✕</button>`;
+  container.appendChild(div);
+}
+
+async function doGroupSplit() {
+  if (!_gsplitFoodId || !_gsplitSrcIngId) return;
+  const groupId = document.getElementById('gsplit-group-select').value;
+  const newGroupName = document.getElementById('gsplit-new-group-name').value.trim();
+  if (!groupId && !newGroupName) { toast('그룹을 선택하거나 새 그룹명을 입력해주세요', 'red'); return; }
+
+  const rows = document.querySelectorAll('#gsplit-members-container .gsplit-row');
+  const members = [];
+  rows.forEach(row => {
+    const name = row.querySelector('.gsplit-name-input').value.trim();
+    if (!name) return;
+    const pctStr = row.querySelector('.gsplit-pct-input').value.trim();
+    const pct = pctStr === '' ? null : parseFloat(pctStr);
+    members.push({ name, pct: Number.isFinite(pct) ? pct : null });
+  });
+  if (!members.length) { toast('멤버를 1개 이상 입력해주세요', 'red'); return; }
+
+  const groupPctStr = document.getElementById('gsplit-group-pct').value.trim();
+  const groupPct = groupPctStr === '' ? null : parseFloat(groupPctStr);
+  const groupPctOp = document.getElementById('gsplit-group-pct-op').value || null;
+
+  const body = { source_ingredient_id: _gsplitSrcIngId, members };
+  if (groupId) body.group_id = groupId;
+  else body.new_group_name = newGroupName;
+  if (groupPct != null && Number.isFinite(groupPct)) {
+    body.group_pct = groupPct;
+    if (groupPctOp) body.group_pct_operator = groupPctOp;
+  }
+
+  if (!confirm(`"${_gsplitSrcIngName}" 을(를) 그룹 + 멤버 ${members.length}개로 분리할까요?`)) return;
+
+  try {
+    const r = await fetch(`${API}/admin/foods/${_gsplitFoodId}/ingredients/group-split`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!r.ok) {
+      const e = await r.json().catch(()=>({}));
+      toast(e.detail || '그룹 분리 실패', 'red');
+      return;
+    }
+    const d = await r.json();
+    if (d.group?.is_new) {
+      _gsplitGroupsCache = _gsplitGroupsCache || [];
+      _gsplitGroupsCache.push({ id: d.group.id, name: d.group.name });
+    }
+    toast(`그룹 분리 완료 (${d.group.name}, 멤버 ${d.members.length}개)`);
+    const savedFoodId = _gsplitFoodId;
+    closeGroupSplitModal();
+    await loadFdIngredients(savedFoodId);
+    renderFdIngTagsReadonly();
+  } catch(e) {
+    console.error(e);
+    toast('오류 발생', 'red');
+  }
+}
+
+document.getElementById('group-split-modal')?.addEventListener('click', e => {
+  if (e.target.id === 'group-split-modal') closeGroupSplitModal();
+});
 
 async function openIngredientNameEdit(id, name) {
   _ieId = id;
