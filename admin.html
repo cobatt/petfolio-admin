@@ -190,6 +190,17 @@ tr:hover td { background: #FAFAF7; }
   display: none; align-items: center; justify-content: center; z-index: 100;
 }
 .modal-overlay.open { display: flex; }
+/* food-detail-modal 위에서 열리는 보조 모달들 — 항상 위로 띄움.
+   DOM 순서 상 food-detail-modal 이 더 뒤에 있어서 같은 z-index 면 가려짐. */
+#ingredient-split-modal,
+#group-split-modal,
+#ingredient-edit-modal,
+#ingredient-group-split-modal,
+#group-create-modal,
+#group-edit-modal,
+#group-foods-modal {
+  z-index: 200;
+}
 .modal {
   background: white; border-radius: 18px; padding: 32px;
   width: 640px; max-height: 92vh; overflow-y: auto;
@@ -255,6 +266,10 @@ tr:hover td { background: #FAFAF7; }
     </button>
     <button class="nav-item" onclick="showPage('ingredients')">
       <span class="nav-icon">🌿</span> 원재료 관리
+    </button>
+    <button class="nav-item" onclick="showPage('groups')">
+      <span class="nav-icon">🧺</span> 그룹 관리
+      <span class="nav-badge" id="nav-groups-count">—</span>
     </button>
   </nav>
   <div class="sidebar-footer">
@@ -905,6 +920,49 @@ tr:hover td { background: #FAFAF7; }
     </div>
   </div>
 
+  <!-- ── 그룹 관리 페이지 ── -->
+  <div class="page" id="page-groups">
+    <div class="page-header">
+      <div class="page-title">🧺 그룹 관리</div>
+      <div class="page-sub">원재료 그룹 (혼합광물질류 합제 같은 묶음) 관리</div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">그룹 목록</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span id="groups-stat" style="font-size:12px;color:#6B7570"></span>
+          <button class="btn btn-green" onclick="openGroupCreateModal()">+ 그룹 생성</button>
+        </div>
+      </div>
+      <div class="toolbar">
+        <input class="search-input" id="groups-search" placeholder="그룹명 검색..." oninput="filterGroups()">
+        <select class="filter-select" id="groups-perpage" onchange="groupsPerPage=+this.value;loadGroups(1)">
+          <option value="20">20개</option>
+          <option value="50">50개</option>
+          <option value="100">100개</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:36px;color:#C2C9C5">#</th>
+              <th>그룹명</th>
+              <th>영문명</th>
+              <th>카테고리</th>
+              <th style="width:90px;text-align:right">멤버 수</th>
+              <th style="width:110px;text-align:right">사용 사료 수</th>
+              <th>액션</th>
+            </tr>
+          </thead>
+          <tbody id="groups-tbody"><tr class="loading-row"><td colspan="7">로딩 중...</td></tr></tbody>
+        </table>
+      </div>
+      <div id="groups-pagination"></div>
+    </div>
+  </div>
+
 </div><!-- /main -->
 
 <!-- ── 수동 매칭 모달 ── -->
@@ -1059,6 +1117,94 @@ tr:hover td { background: #FAFAF7; }
   </div>
 </div>
 
+<!-- ── 원재료 → 그룹 일괄 분리 모달 (ingredients 페이지 컨텍스트) ── -->
+<div class="modal-overlay" id="ingredient-group-split-modal">
+  <div class="modal" style="width:560px">
+    <div class="modal-title">🧺 그룹 분리 (사용 사료 전체 적용)</div>
+    <div class="modal-label">원본 원재료</div>
+    <div id="igs-source-name" style="font-size:13px;font-weight:600;color:#6B7570;padding:8px 12px;background:#FAFAF7;border-radius:8px;border:1px solid #EBF2EE;margin-bottom:6px"></div>
+    <div id="igs-affected" style="font-size:11px;color:#7A5A1D;background:#FAF6EE;border:1px solid #E5DDD0;border-radius:8px;padding:6px 10px;margin-bottom:12px">대상 사료 수 확인 중…</div>
+
+    <div class="modal-label">그룹</div>
+    <select class="modal-input" id="igs-group-select" style="margin:0 0 6px 0" onchange="onIngGroupSplitGroupSelectChange()">
+      <option value="">— 신규 그룹 생성 —</option>
+    </select>
+    <input class="modal-input" id="igs-new-group-name" placeholder="신규 그룹명 (UNIQUE)" style="margin:0 0 12px 0">
+
+    <div style="display:flex;gap:6px;align-items:center;margin-bottom:12px">
+      <div class="modal-label" style="margin:0;flex:1">그룹 전체 함량 (선택)</div>
+      <input class="modal-input" id="igs-group-pct" type="number" min="0" step="0.01" placeholder="pct" style="margin:0;width:96px">
+      <span style="font-size:11px;color:#9CA8A1">%</span>
+      <select class="modal-input" id="igs-group-pct-op" style="margin:0;width:80px">
+        <option value="">—</option>
+        <option value="이상">이상</option>
+        <option value="이하">이하</option>
+      </select>
+    </div>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <div class="modal-label" style="margin:0">그룹 멤버 <span style="font-size:11px;color:#6B7570;font-weight:400">(이름 + pct 선택, 순서 유지)</span></div>
+      <button class="btn-sm btn-outline" onclick="addIngGroupSplitMember('', '')">+ 멤버 추가</button>
+    </div>
+    <div id="igs-members-container" style="display:flex;flex-direction:column;gap:6px;min-height:60px;margin-bottom:4px"></div>
+
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeIngGroupSplitModal()">취소</button>
+      <button class="btn btn-green" onclick="doIngGroupSplit()">그룹 분리 적용</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── 그룹 생성 모달 ── -->
+<div class="modal-overlay" id="group-create-modal">
+  <div class="modal" style="width:460px">
+    <div class="modal-title">+ 그룹 생성</div>
+    <div class="modal-label">그룹명 *</div>
+    <input class="modal-input" id="gc-name" placeholder="예: 혼합광물질류 합제">
+    <div class="modal-label" style="margin-top:10px">영문명 (선택)</div>
+    <input class="modal-input" id="gc-name-en" placeholder="예: Mineral Mix">
+    <div class="modal-label" style="margin-top:10px">카테고리 (선택)</div>
+    <input class="modal-input" id="gc-category" placeholder="예: 첨가물">
+    <div class="modal-label" style="margin-top:10px">설명 (선택)</div>
+    <input class="modal-input" id="gc-description" placeholder="설명...">
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeGroupCreateModal()">취소</button>
+      <button class="btn btn-green" onclick="saveGroupCreate()">생성</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── 그룹 수정 모달 ── -->
+<div class="modal-overlay" id="group-edit-modal">
+  <div class="modal" style="width:460px">
+    <div class="modal-title">그룹 수정</div>
+    <div class="modal-label">그룹명 *</div>
+    <input class="modal-input" id="ge-name">
+    <div class="modal-label" style="margin-top:10px">영문명</div>
+    <input class="modal-input" id="ge-name-en">
+    <div class="modal-label" style="margin-top:10px">카테고리</div>
+    <input class="modal-input" id="ge-category">
+    <div class="modal-label" style="margin-top:10px">설명</div>
+    <input class="modal-input" id="ge-description">
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeGroupEditModal()">취소</button>
+      <button class="btn btn-green" onclick="saveGroupEdit()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── 그룹 사용 사료 모달 ── -->
+<div class="modal-overlay" id="group-foods-modal">
+  <div class="modal" style="width:600px;max-height:80vh;overflow-y:auto">
+    <div class="modal-title" id="gf-title">사용 사료 목록</div>
+    <div id="gf-stat" style="font-size:12px;color:#6B7570;margin-bottom:8px"></div>
+    <div id="gf-list" style="display:flex;flex-direction:column;gap:6px;min-height:60px"></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeGroupFoodsModal()">닫기</button>
+    </div>
+  </div>
+</div>
+
 <!-- 토스트 -->
 <div class="toast" id="toast"></div>
 
@@ -1115,7 +1261,7 @@ function showPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('page-' + name).classList.add('active');
-  const pages = ['dashboard','foods','barcode','brands','users','pets-admin','ingredients'];
+  const pages = ['dashboard','foods','barcode','brands','users','pets-admin','ingredients','groups'];
   const idx = pages.indexOf(name);
   if (idx >= 0) document.querySelectorAll('.nav-item')[idx].classList.add('active');
 
@@ -1131,6 +1277,7 @@ function showPage(name) {
   if (name === 'pets-admin') loadPetsAdmin();
   if (name === 'ingredients') { loadIngredients(1); loadAllIngredients(); loadCoverageStats(); }
   if (name === 'foods') { loadFoodsStats(); }
+  if (name === 'groups') { loadGroups(1); }
 }
 
 // ── 토스트 ────────────────────────────────────────────────────
@@ -3927,7 +4074,8 @@ function renderIngredientsPage() {
       <td><span class="badge ${i.is_allergen?'badge-amber':'badge-gray'}">${i.is_allergen?'알레르기':'—'}</span></td>
       <td style="display:flex;gap:4px;flex-wrap:wrap">
         <button class="btn-sm btn-outline btn-ing-edit" data-id="${i.id}" data-name="${(i.name||'').replace(/"/g,'&quot;')}">수정</button>
-        <button class="btn-sm btn-split" style="background:#EEF2FF;color:#4F46E5;border:1px solid #C7D2FE;border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer" data-id="${i.id}" data-name="${(i.name||'').replace(/"/g,'&quot;')}">원재료 분리</button>
+        <button class="btn-sm btn-split" style="background:#EEF2FF;color:#4F46E5;border:1px solid #C7D2FE;border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer" data-id="${i.id}" data-name="${(i.name||'').replace(/"/g,'&quot;')}">✂️ 원재료 분리</button>
+        <button class="btn-sm btn-ing-group-split" style="background:#FAF6EE;color:#7A5A1D;border:1px solid #E5DDD0;border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer" data-id="${i.id}" data-name="${(i.name||'').replace(/"/g,'&quot;')}">🧺 그룹 분리</button>
         <button class="btn-sm btn-red btn-ing-delete" data-id="${i.id}" data-name="${(i.name||'').replace(/"/g,'&quot;')}" data-food-count="${i.food_count||0}">삭제</button>
       </td>
     </tr>
@@ -3939,6 +4087,8 @@ function renderIngredientsPage() {
 document.querySelector('#ingredients-tbody')?.addEventListener('click', e => {
   const splitBtn = e.target.closest('.btn-split');
   if (splitBtn) { openSplitModal(splitBtn.dataset.id, splitBtn.dataset.name); return; }
+  const groupSplitBtn = e.target.closest('.btn-ing-group-split');
+  if (groupSplitBtn) { openIngGroupSplitModal(groupSplitBtn.dataset.id, groupSplitBtn.dataset.name); return; }
   const editBtn = e.target.closest('.btn-ing-edit');
   if (editBtn) { openIngredientNameEdit(editBtn.dataset.id, editBtn.dataset.name); return; }
   const delBtn = e.target.closest('.btn-ing-delete');
@@ -4203,6 +4353,376 @@ async function doGroupSplit() {
 
 document.getElementById('group-split-modal')?.addEventListener('click', e => {
   if (e.target.id === 'group-split-modal') closeGroupSplitModal();
+});
+
+// ── 그룹 분리 (ingredients 페이지 컨텍스트 — 사용 사료 전체에 일괄 적용) ────
+let _igsSrcIngId = null;
+let _igsSrcIngName = null;
+let _igsAffectedFoods = [];  // GET /admin/ingredients/{id}/foods 결과 캐시
+
+async function openIngGroupSplitModal(srcIngId, srcIngName) {
+  _igsSrcIngId = srcIngId;
+  _igsSrcIngName = srcIngName;
+  document.getElementById('igs-source-name').textContent = srcIngName;
+  document.getElementById('igs-affected').textContent = '대상 사료 수 확인 중…';
+  document.getElementById('igs-new-group-name').value = '';
+  document.getElementById('igs-new-group-name').style.display = 'block';
+  document.getElementById('igs-group-pct').value = '';
+  document.getElementById('igs-group-pct-op').value = '';
+
+  // 그룹 드롭다운 (group-split-modal 과 같은 캐시 공유)
+  if (!_gsplitGroupsCache) {
+    try {
+      const r = await fetch(`${API}/admin/ingredient-groups?limit=500`);
+      _gsplitGroupsCache = r.ok ? ((await r.json()).items || []) : [];
+    } catch(e) { _gsplitGroupsCache = []; }
+  }
+  const sel = document.getElementById('igs-group-select');
+  sel.innerHTML = '<option value="">— 신규 그룹 생성 —</option>' +
+    _gsplitGroupsCache.map(g => `<option value="${g.id}">${(g.name||'').replace(/</g,'&lt;')}</option>`).join('');
+  sel.value = '';
+
+  const container = document.getElementById('igs-members-container');
+  container.innerHTML = '';
+  addIngGroupSplitMember('', '');
+  addIngGroupSplitMember('', '');
+
+  document.getElementById('ingredient-group-split-modal').classList.add('open');
+
+  // 사용 사료 목록 로드
+  _igsAffectedFoods = [];
+  try {
+    const r = await fetch(`${API}/admin/ingredients/${srcIngId}/foods?limit=500`);
+    if (r.ok) {
+      const d = await r.json();
+      _igsAffectedFoods = d.items || [];
+    }
+  } catch(e) {}
+  const aff = document.getElementById('igs-affected');
+  if (_igsAffectedFoods.length === 0) {
+    aff.textContent = '⚠ 이 원재료를 사용 중인 사료가 없어요';
+    aff.style.color = '#D94F3D';
+  } else {
+    aff.textContent = `📦 적용 대상: ${_igsAffectedFoods.length}개 상품`;
+    aff.style.color = '#7A5A1D';
+  }
+}
+
+function onIngGroupSplitGroupSelectChange() {
+  const sel = document.getElementById('igs-group-select');
+  const nameInput = document.getElementById('igs-new-group-name');
+  if (sel.value) { nameInput.style.display = 'none'; nameInput.value = ''; }
+  else { nameInput.style.display = 'block'; }
+}
+
+function closeIngGroupSplitModal() {
+  document.getElementById('ingredient-group-split-modal').classList.remove('open');
+  _igsSrcIngId = null; _igsSrcIngName = null; _igsAffectedFoods = [];
+}
+
+function addIngGroupSplitMember(nameVal = '', pctVal = '') {
+  const container = document.getElementById('igs-members-container');
+  const div = document.createElement('div');
+  div.className = 'igs-row';
+  div.style.cssText = 'display:flex;gap:6px;align-items:center';
+  const safeName = String(nameVal).replace(/"/g, '&quot;');
+  const safePct = String(pctVal).replace(/"/g, '&quot;');
+  div.innerHTML = `
+    <input class="modal-input igs-name-input" value="${safeName}" placeholder="멤버 이름" style="margin:0;flex:1">
+    <input class="modal-input igs-pct-input" type="number" min="0" step="0.01" value="${safePct}" placeholder="pct (선택)" style="margin:0;width:96px">
+    <span style="font-size:11px;color:#9CA8A1;flex-shrink:0">%</span>
+    <button class="btn-sm btn-red" onclick="this.parentElement.remove()" style="flex-shrink:0">✕</button>`;
+  container.appendChild(div);
+}
+
+async function doIngGroupSplit() {
+  if (!_igsSrcIngId) return;
+  if (!_igsAffectedFoods.length) { toast('적용할 사료가 없어요', 'red'); return; }
+
+  let groupId = document.getElementById('igs-group-select').value;
+  const newGroupName = document.getElementById('igs-new-group-name').value.trim();
+  if (!groupId && !newGroupName) { toast('그룹을 선택하거나 새 그룹명을 입력해주세요', 'red'); return; }
+
+  const rows = document.querySelectorAll('#igs-members-container .igs-row');
+  const members = [];
+  rows.forEach(row => {
+    const name = row.querySelector('.igs-name-input').value.trim();
+    if (!name) return;
+    const pctStr = row.querySelector('.igs-pct-input').value.trim();
+    const pct = pctStr === '' ? null : parseFloat(pctStr);
+    members.push({ name, pct: Number.isFinite(pct) ? pct : null });
+  });
+  if (!members.length) { toast('멤버를 1개 이상 입력해주세요', 'red'); return; }
+
+  const groupPctStr = document.getElementById('igs-group-pct').value.trim();
+  const groupPct = groupPctStr === '' ? null : parseFloat(groupPctStr);
+  const groupPctOp = document.getElementById('igs-group-pct-op').value || null;
+
+  const foods = _igsAffectedFoods.slice();
+  if (!confirm(`"${_igsSrcIngName}" 을(를) ${foods.length}개 상품에 일괄 그룹 분리할까요?`)) return;
+
+  // 신규 그룹이면 먼저 생성 (UNIQUE 충돌 방지 위해 한 번만)
+  let groupName = null;
+  let groupIsNew = false;
+  if (!groupId) {
+    try {
+      const cr = await fetch(`${API}/admin/ingredient-groups`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newGroupName }),
+      });
+      if (!cr.ok) {
+        const e = await cr.json().catch(()=>({}));
+        toast(e.detail || '그룹 생성 실패', 'red');
+        return;
+      }
+      const cd = await cr.json();
+      groupId = cd.id;
+      groupName = cd.name;
+      groupIsNew = true;
+      _gsplitGroupsCache = _gsplitGroupsCache || [];
+      _gsplitGroupsCache.push({ id: cd.id, name: cd.name });
+    } catch(e) {
+      toast('그룹 생성 오류', 'red');
+      return;
+    }
+  }
+
+  // 각 사료에 group-split 호출 (순차 — 백엔드 트랜잭션 분리)
+  const body0 = { source_ingredient_id: _igsSrcIngId, group_id: groupId, members };
+  if (groupPct != null && Number.isFinite(groupPct)) {
+    body0.group_pct = groupPct;
+    if (groupPctOp) body0.group_pct_operator = groupPctOp;
+  }
+  let okCount = 0, failCount = 0;
+  for (const f of foods) {
+    try {
+      const r = await fetch(`${API}/admin/foods/${f.id}/ingredients/group-split`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body0),
+      });
+      if (r.ok) okCount++; else failCount++;
+    } catch(e) { failCount++; }
+  }
+  const msg = failCount === 0
+    ? `${okCount}개 상품에 그룹 분리 적용됨${groupIsNew ? ` (신규 그룹: ${groupName})` : ''}`
+    : `완료 ${okCount}건 / 실패 ${failCount}건`;
+  toast(msg, failCount > 0 ? 'red' : undefined);
+  closeIngGroupSplitModal();
+  // 원재료 캐시 갱신 — source ingredient 가 마지막 사료에서 삭제됐을 수 있음
+  loadIngredients(ingredientsPage);
+}
+
+document.getElementById('ingredient-group-split-modal')?.addEventListener('click', e => {
+  if (e.target.id === 'ingredient-group-split-modal') closeIngGroupSplitModal();
+});
+
+// ── 그룹 관리 (탭) ───────────────────────────────────────────
+let groupsItems = [], groupsTotal = 0, groupsPage = 1, groupsPerPage = 20;
+let _groupsById = {};
+
+async function loadGroups(page = 1) {
+  groupsPage = page;
+  const q = document.getElementById('groups-search')?.value || '';
+  const params = new URLSearchParams({ limit: groupsPerPage, offset: (page - 1) * groupsPerPage });
+  if (q) params.set('q', q);
+  try {
+    const r = await fetch(`${API}/admin/ingredient-groups?${params}`);
+    if (!r.ok) { toast('그룹 목록 로드 실패', 'red'); return; }
+    const d = await r.json();
+    groupsItems = d.items || [];
+    groupsTotal = d.total || 0;
+    document.getElementById('groups-stat').textContent = `${groupsTotal.toLocaleString()}개`;
+    const nav = document.getElementById('nav-groups-count');
+    if (nav) nav.textContent = groupsTotal.toLocaleString();
+    renderGroupsPage();
+  } catch(e) {
+    toast('그룹 목록 로드 오류', 'red');
+  }
+}
+
+let _groupsFilterTimer = null;
+function filterGroups() {
+  clearTimeout(_groupsFilterTimer);
+  _groupsFilterTimer = setTimeout(() => loadGroups(1), 250);
+}
+
+function gotoGroupsPage(p) { loadGroups(p); }
+
+function renderGroupsPage() {
+  const tbody = document.getElementById('groups-tbody');
+  _groupsById = {};
+  groupsItems.forEach(g => _groupsById[g.id] = g);
+  if (!groupsItems.length) {
+    tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><div class="empty-icon">🧺</div><div class="empty-title">그룹이 없어요</div><div class="empty-sub">+ 그룹 생성 버튼으로 추가해주세요</div></div></td></tr>';
+    document.getElementById('groups-pagination').innerHTML = '';
+    return;
+  }
+  const startIdx = (groupsPage - 1) * groupsPerPage;
+  tbody.innerHTML = groupsItems.map((g, idx) => `
+    <tr>
+      <td style="font-size:11px;color:#C2C9C5;text-align:center;font-family:'Courier New',monospace" title="${g.id}">${groupsTotal - startIdx - idx}</td>
+      <td><div style="font-weight:700;font-size:13px">${(g.name||'—').replace(/</g,'&lt;')}</div>${g.description ? `<div style="font-size:10px;color:#6B7570;margin-top:2px">${g.description.slice(0,50)}</div>` : ''}</td>
+      <td style="font-size:12px;color:#6B7570">${(g.name_en||'—').replace(/</g,'&lt;')}</td>
+      <td>${g.category ? `<span class="badge badge-gray">${g.category}</span>` : '—'}</td>
+      <td style="text-align:right;font-size:12px;color:#1A1F1C">${(g.member_count ?? 0).toLocaleString()}</td>
+      <td style="text-align:right">
+        ${(g.food_count ?? 0) > 0
+          ? `<button class="btn-sm btn-grp-foods" data-id="${g.id}" data-name="${(g.name||'').replace(/"/g,'&quot;')}" style="background:#FAF6EE;color:#7A5A1D;border:1px solid #E5DDD0;border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer">${g.food_count.toLocaleString()}개</button>`
+          : '<span style="font-size:12px;color:#C2C9C5">0</span>'}
+      </td>
+      <td style="display:flex;gap:4px;flex-wrap:wrap">
+        <button class="btn-sm btn-outline btn-grp-edit" data-id="${g.id}">수정</button>
+        <button class="btn-sm btn-red btn-grp-delete" data-id="${g.id}" data-name="${(g.name||'').replace(/"/g,'&quot;')}" data-member-count="${g.member_count||0}" data-food-count="${g.food_count||0}">삭제</button>
+      </td>
+    </tr>
+  `).join('');
+  renderPagination('groups-pagination', groupsTotal, groupsPage, groupsPerPage, 'gotoGroupsPage');
+}
+
+// 그룹 목록 액션 위임
+document.querySelector('#groups-tbody')?.addEventListener('click', e => {
+  const editBtn = e.target.closest('.btn-grp-edit');
+  if (editBtn) { openGroupEditModal(editBtn.dataset.id); return; }
+  const delBtn = e.target.closest('.btn-grp-delete');
+  if (delBtn) {
+    deleteGroup(delBtn.dataset.id, delBtn.dataset.name,
+      parseInt(delBtn.dataset.memberCount) || 0,
+      parseInt(delBtn.dataset.foodCount) || 0);
+    return;
+  }
+  const foodsBtn = e.target.closest('.btn-grp-foods');
+  if (foodsBtn) { openGroupFoodsModal(foodsBtn.dataset.id, foodsBtn.dataset.name); return; }
+});
+
+// ── 그룹 생성 모달 ─────────────────────────────────────────
+function openGroupCreateModal() {
+  ['gc-name','gc-name-en','gc-category','gc-description'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  document.getElementById('group-create-modal').classList.add('open');
+  setTimeout(() => document.getElementById('gc-name').focus(), 50);
+}
+function closeGroupCreateModal() {
+  document.getElementById('group-create-modal').classList.remove('open');
+}
+async function saveGroupCreate() {
+  const name = document.getElementById('gc-name').value.trim();
+  if (!name) { toast('그룹명은 필수예요', 'red'); return; }
+  const body = {
+    name,
+    name_en: document.getElementById('gc-name-en').value.trim() || null,
+    category: document.getElementById('gc-category').value.trim() || null,
+    description: document.getElementById('gc-description').value.trim() || null,
+  };
+  try {
+    const r = await fetch(`${API}/admin/ingredient-groups`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    if (!r.ok) { const e = await r.json().catch(()=>({})); toast(e.detail || '생성 실패', 'red'); return; }
+    const d = await r.json();
+    _gsplitGroupsCache = _gsplitGroupsCache || [];
+    _gsplitGroupsCache.push({ id: d.id, name: d.name });
+    toast(`"${d.name}" 그룹 생성됨`);
+    closeGroupCreateModal();
+    loadGroups(1);
+  } catch(e) { toast('오류 발생', 'red'); }
+}
+document.getElementById('group-create-modal')?.addEventListener('click', e => {
+  if (e.target.id === 'group-create-modal') closeGroupCreateModal();
+});
+
+// ── 그룹 수정 모달 ─────────────────────────────────────────
+let _geId = null;
+function openGroupEditModal(id) {
+  const g = _groupsById[id];
+  if (!g) return;
+  _geId = id;
+  document.getElementById('ge-name').value = g.name || '';
+  document.getElementById('ge-name-en').value = g.name_en || '';
+  document.getElementById('ge-category').value = g.category || '';
+  document.getElementById('ge-description').value = g.description || '';
+  document.getElementById('group-edit-modal').classList.add('open');
+  setTimeout(() => document.getElementById('ge-name').focus(), 50);
+}
+function closeGroupEditModal() {
+  document.getElementById('group-edit-modal').classList.remove('open');
+  _geId = null;
+}
+async function saveGroupEdit() {
+  if (!_geId) return;
+  const name = document.getElementById('ge-name').value.trim();
+  if (!name) { toast('그룹명은 필수예요', 'red'); return; }
+  const body = {
+    name,
+    name_en: document.getElementById('ge-name-en').value.trim() || null,
+    category: document.getElementById('ge-category').value.trim() || null,
+    description: document.getElementById('ge-description').value.trim() || null,
+  };
+  try {
+    const r = await fetch(`${API}/admin/ingredient-groups/${_geId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    if (!r.ok) { const e = await r.json().catch(()=>({})); toast(e.detail || '수정 실패', 'red'); return; }
+    // 캐시 무효화 (이름 변경 가능성)
+    _gsplitGroupsCache = null;
+    toast('수정 완료');
+    closeGroupEditModal();
+    loadGroups(groupsPage);
+  } catch(e) { toast('오류 발생', 'red'); }
+}
+document.getElementById('group-edit-modal')?.addEventListener('click', e => {
+  if (e.target.id === 'group-edit-modal') closeGroupEditModal();
+});
+
+// ── 그룹 삭제 ─────────────────────────────────────────────
+async function deleteGroup(id, name, memberCount, foodCount) {
+  const warn = (memberCount > 0 || foodCount > 0)
+    ? `\n\n⚠ 이 그룹을 사용하는 원재료 ${memberCount}개, 사료 ${foodCount}개가 있습니다.\n삭제하면 그룹 연결이 해제됩니다 (food_ingredients 행은 보존, group_id 만 NULL).`
+    : '';
+  if (!confirm(`"${name}" 그룹을 삭제할까요?${warn}`)) return;
+  try {
+    const r = await fetch(`${API}/admin/ingredient-groups/${id}`, { method: 'DELETE' });
+    if (!r.ok && r.status !== 204) { toast('삭제 실패', 'red'); return; }
+    if (_gsplitGroupsCache) _gsplitGroupsCache = _gsplitGroupsCache.filter(g => g.id !== id);
+    toast(`"${name}" 삭제됨`);
+    loadGroups(groupsPage);
+  } catch(e) { toast('오류 발생', 'red'); }
+}
+
+// ── 그룹 사용 사료 모달 ─────────────────────────────────────
+async function openGroupFoodsModal(id, name) {
+  document.getElementById('gf-title').textContent = `"${name}" 사용 사료 목록`;
+  document.getElementById('gf-list').innerHTML = '<div style="color:#6B7570;font-size:12px;padding:8px">로딩 중…</div>';
+  document.getElementById('gf-stat').textContent = '';
+  document.getElementById('group-foods-modal').classList.add('open');
+  try {
+    const r = await fetch(`${API}/admin/ingredient-groups/${id}/foods?limit=500`);
+    if (!r.ok) { document.getElementById('gf-list').innerHTML = '<div style="color:#D94F3D;font-size:12px">로드 실패</div>'; return; }
+    const d = await r.json();
+    document.getElementById('gf-stat').textContent = `${(d.total || 0).toLocaleString()}개`;
+    if (!d.items || d.items.length === 0) {
+      document.getElementById('gf-list').innerHTML = '<div style="color:#C2C9C5;font-size:12px;padding:8px">사용 중인 사료가 없어요</div>';
+      return;
+    }
+    document.getElementById('gf-list').innerHTML = d.items.map(f => `
+      <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:#FAFAF7;border:1px solid #EBF2EE;border-radius:8px;cursor:pointer" onclick="closeGroupFoodsModal();openFoodDetail('${f.id}')">
+        <span style="font-size:16px">${f.emoji || '📦'}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${(f.name||'(이름 없음)').replace(/</g,'&lt;')}</div>
+          <div style="font-size:10px;color:#6B7570">${(f.brand||'—').replace(/</g,'&lt;')} · ${f.category||'—'}</div>
+        </div>
+        <span style="font-size:10px;color:#9CA8A1">상세 →</span>
+      </div>
+    `).join('');
+  } catch(e) {
+    document.getElementById('gf-list').innerHTML = '<div style="color:#D94F3D;font-size:12px">오류 발생</div>';
+  }
+}
+function closeGroupFoodsModal() {
+  document.getElementById('group-foods-modal').classList.remove('open');
+}
+document.getElementById('group-foods-modal')?.addEventListener('click', e => {
+  if (e.target.id === 'group-foods-modal') closeGroupFoodsModal();
 });
 
 async function openIngredientNameEdit(id, name) {
