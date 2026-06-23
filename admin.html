@@ -68,11 +68,6 @@ body { font-family: -apple-system, 'Pretendard', sans-serif; background: #F5F5F2
 .stat-sub { font-size: 11px; color: #C2C9C5; margin-top: 4px; }
 
 /* ── 커버리지 바 ── */
-.coverage-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 24px; }
-.coverage-card { background: white; border-radius: 14px; padding: 18px 20px; border: 1px solid #EBF2EE; }
-.coverage-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-.coverage-title { font-size: 12px; font-weight: 700; color: #1A1F1C; }
-.coverage-pct { font-size: 18px; font-weight: 700; color: #4A7C59; }
 .cov-bar-track { height: 8px; background: #EBF2EE; border-radius: 99px; overflow: hidden; }
 .cov-bar-fill { height: 8px; border-radius: 99px; background: #4A7C59; transition: width 0.8s ease; }
 .cov-bar-fill.amber { background: #E8A030; }
@@ -85,7 +80,6 @@ body { font-family: -apple-system, 'Pretendard', sans-serif; background: #F5F5F2
 .card-header { padding: 16px 20px; border-bottom: 1px solid #EBF2EE; display: flex; align-items: center; justify-content: space-between; }
 .card-title { font-size: 14px; font-weight: 700; color: #1A1F1C; }
 .card-count { font-size: 12px; color: #6B7570; background: #EBF2EE; padding: 3px 10px; border-radius: 99px; font-weight: 600; }
-.card-body { padding: 0; }
 
 /* ── 툴바 ── */
 .toolbar { padding: 12px 16px; border-bottom: 1px solid #F5F5F3; display: flex; gap: 8px; background: #FAFAF7; }
@@ -161,9 +155,6 @@ tr:hover td { background: #FAFAF7; }
 /* ── 로딩 ── */
 .loading-row td { text-align: center; padding: 40px; color: #C2C9C5; font-size: 13px; }
 
-/* ── 진행바 섹션 ── */
-.section-title { font-size: 13px; font-weight: 700; color: #1A1F1C; margin-bottom: 14px; }
-
 /* ── 최근 매칭 카드 ── */
 .match-list { display: flex; flex-direction: column; gap: 0; }
 .match-item { display: flex; align-items: center; gap: 12px; padding: 12px 20px; border-bottom: 1px solid #F5F5F3; }
@@ -172,7 +163,6 @@ tr:hover td { background: #FAFAF7; }
 .match-info { flex: 1; min-width: 0; }
 .match-name { font-size: 12px; font-weight: 600; color: #1A1F1C; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .match-barcode { font-size: 11px; color: #6B7570; font-family: 'Courier New', monospace; margin-top: 1px; }
-.match-source { font-size: 10px; }
 
 /* ── 토스트 ── */
 .toast {
@@ -222,14 +212,6 @@ tr:hover td { background: #FAFAF7; }
 .modal-food-item:hover { border-color: #4A7C59; background: #EBF2EE; }
 .modal-food-item.selected { border-color: #4A7C59; background: #EBF2EE; }
 
-/* ── 스캔 로그 타임라인 ── */
-.log-item { display: flex; gap: 14px; padding: 12px 20px; border-bottom: 1px solid #F5F5F3; }
-.log-item:last-child { border-bottom: none; }
-.log-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
-.log-content { flex: 1; }
-.log-action { font-size: 13px; font-weight: 600; color: #1A1F1C; }
-.log-detail { font-size: 11px; color: #6B7570; margin-top: 2px; font-family: 'Courier New', monospace; }
-.log-time { font-size: 11px; color: #C2C9C5; }
 </style>
 </head>
 <body>
@@ -1220,7 +1202,6 @@ function buildSeqMap(arr) {
   return map;
 }
 let foodsItems = [], foodsTotal = 0, foodsPage = 1, foodsPerPage = 20;
-let filteredFoods = [];
 let filteredBrands = [], brandsPage = 1, brandsPerPage = 20;
 let filteredIngredients = [], ingredientsPage = 1, ingredientsPerPage = 20;
 let ingredientsItems = [], ingredientsTotal = 0;
@@ -3780,12 +3761,7 @@ async function loadCoverageStats() {
     const r = await fetch(`${API}/admin/coverage-stats`);
     if (!r.ok) return;
     _coverageStats = await r.json();
-    renderCoverageStats(_coverageStats);
   } catch(e) { console.error(e); }
-}
-
-function renderCoverageStats(s) {
-  // coverage stats loaded — unlinked section uses loadUnlinkedFoods() independently
 }
 
 async function loadFoodsStats() {
