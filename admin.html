@@ -1256,7 +1256,7 @@ function showPage(name) {
   }
   if (name === 'users') loadUsers();
   if (name === 'pets-admin') loadPetsAdmin();
-  if (name === 'ingredients') { loadIngredients(1); loadAllIngredients(); loadCoverageStats(); }
+  if (name === 'ingredients') { loadIngredients(1); loadAllIngredients(); }
   if (name === 'foods') { loadFoodsStats(); }
   if (name === 'groups') { loadGroups(1); }
 }
@@ -1290,8 +1290,6 @@ async function loadDashboard() {
       fetch(`${API}/foods/admin/barcode-stats`),
       fetch(`${API}/foods/admin/recent-matches?limit=8`),
     ]);
-    // 커버리지 통계 비동기 로드 (대시보드와 병렬)
-    loadCoverageStats();
     loadFoodsStats();
 
     if (statsRes.ok) {
@@ -3754,15 +3752,6 @@ async function deletePetAdmin(petId, petName) {
 
 // ── 원재료 관리 ───────────────────────────────────────────────
 let allIngredients = [];
-let _coverageStats = null;
-
-async function loadCoverageStats() {
-  try {
-    const r = await fetch(`${API}/admin/coverage-stats`);
-    if (!r.ok) return;
-    _coverageStats = await r.json();
-  } catch(e) { console.error(e); }
-}
 
 async function loadFoodsStats() {
   try {
@@ -3830,7 +3819,6 @@ async function resyncFoodIngredients() {
     const r = await fetch(`${API}/admin/resync-food-ingredients`, { method: 'POST' });
     const data = await r.json();
     toast(`재동기화 완료 ✓ (${data.synced_rows}개 행 처리)`);
-    await loadCoverageStats();
   } catch(e) { toast('오류 발생', 'red'); }
   finally { btn.disabled = false; btn.textContent = '⚡ 재동기화'; }
 }
@@ -3859,7 +3847,7 @@ async function rebuildIngredientsFromScratch() {
     // 캐시 전체 초기화 후 재로드
     allIngredients = [];
     allFoods = [];
-    await Promise.all([loadIngredients(1), loadAllIngredients(), loadCoverageStats()]);
+    await Promise.all([loadIngredients(1), loadAllIngredients()]);
   } catch(e) { console.error(e); toast('오류 발생', 'red'); }
   finally { btn.disabled = false; btn.textContent = '🔄 전체 재건'; }
 }
