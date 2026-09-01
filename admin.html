@@ -3767,50 +3767,6 @@ async function loadFoodsStats() {
   } catch(e) { console.error('foods-stats error', e); }
 }
 
-async function loadUnlinkedFoods() {
-  const type = document.getElementById('cov-filter-type').value;
-  const list = document.getElementById('cov-unlinked-list');
-  const countEl = document.getElementById('cov-unlinked-count');
-  list.innerHTML = '<div style="padding:20px;text-align:center;color:#C2C9C5;font-size:12px">로딩 중...</div>';
-  try {
-    const r = await fetch(`${API}/admin/unlinked-foods?type=${type}&limit=200`);
-    const rows = await r.json();
-    countEl.textContent = `${rows.length}개 표시`;
-    if (!rows.length) {
-      list.innerHTML = '<div style="padding:16px;text-align:center;color:#C2C9C5;font-size:12px">없음 ✓</div>';
-      return;
-    }
-    list.innerHTML = rows.map(f => {
-      const miCount = f.mi_count || 0;
-      const jiCount = f.ji_count || 0;
-      const badge = type === 'partial_junction'
-        ? `<span style="font-size:10px;color:#E8A030;background:#FEF3E2;padding:1px 6px;border-radius:8px">${jiCount}/${miCount}</span>`
-        : miCount > 0
-          ? `<span style="font-size:10px;color:#4A7C59;background:#EBF2EE;padding:1px 6px;border-radius:8px">main ${miCount}개</span>`
-          : `<span style="font-size:10px;color:#C2C9C5;background:#F5F5F3;padding:1px 6px;border-radius:8px">텍스트만</span>`;
-      return `<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid #F5F5F3;font-size:12px">
-        <span style="color:#C2C9C5;min-width:12px;font-size:10px">${f.category==='food'?'📦':'🦴'}</span>
-        <span style="font-size:10px;color:#6B7570;min-width:60px;font-weight:700">${(f.brand||'').slice(0,8)}</span>
-        <span style="flex:1;color:#1A1F1C">${(f.name||'').slice(0,40)}</span>
-        ${badge}
-        <button class="btn-sm btn-outline" style="font-size:10px;padding:2px 7px" onclick="openFoodDetail('${f.id}')">상세</button>
-      </div>`;
-    }).join('');
-  } catch(e) { list.innerHTML = '<div style="padding:16px;color:#D94F3D;font-size:12px">오류 발생</div>'; }
-}
-
-function toggleUnlinkedSection(type) {
-  const sec = document.getElementById('cov-unlinked-section');
-  const typeEl = document.getElementById('cov-filter-type');
-  if (sec.style.display === 'none' || typeEl.value !== type) {
-    sec.style.display = 'block';
-    typeEl.value = type;
-    loadUnlinkedFoods();
-  } else {
-    sec.style.display = 'none';
-  }
-}
-
 async function resyncFoodIngredients() {
   const btn = document.getElementById('resync-btn');
   btn.disabled = true;
@@ -3962,17 +3918,6 @@ async function loadAliasHistory(page = 1) {
   } catch(e) {
     countEl.textContent = '오류';
     tbody.innerHTML = `<tr><td colspan="5" style="color:red;padding:20px">${e.message}</td></tr>`;
-  }
-}
-
-async function deleteAlias(id) {
-  if (!confirm('이 alias 항목을 삭제하시겠습니까?\nrebuild 시 이 매핑은 더 이상 적용되지 않습니다.')) return;
-  try {
-    const r = await fetch(`${API}/admin/ingredients/aliases/${id}`, { method: 'DELETE' });
-    if (!r.ok) throw new Error(r.status);
-    loadAliasHistory(_aliasCurrentPage);
-  } catch(e) {
-    alert('삭제 실패: ' + e.message);
   }
 }
 
@@ -4885,8 +4830,6 @@ const SYNONYM_MAP = [
   ['오일', '오일류', '기름'],
   ['추출물', '엑기스', '엑스트랙트'],
 ];
-const PREFIX_WORDS = ['신선한', '생', '프레시', '건조', '말린', '드라이', '냉동', '훈제', '유기농', '무항생제'];
-
 function groupBySpace(list) {
   const map = {};
   list.forEach(i => {
@@ -4901,18 +4844,6 @@ function groupBySpecial(list) {
   const map = {};
   list.forEach(i => {
     const key = i.name.replace(/[\s\(\)\,\<\>\-\"\'\·\/\%\[\]\+\&\.]/g, '').toLowerCase();
-    if (!map[key]) map[key] = [];
-    map[key].push(i);
-  });
-  return Object.values(map).filter(g => g.length >= 2);
-}
-
-function groupByPrefix(list) {
-  const map = {};
-  list.forEach(i => {
-    let key = i.name.trim().toLowerCase();
-    PREFIX_WORDS.forEach(p => { key = key.replace(new RegExp('^' + p + '\\s*'), ''); });
-    key = key.trim();
     if (!map[key]) map[key] = [];
     map[key].push(i);
   });
@@ -5024,10 +4955,6 @@ function renderDedupPagination() {
 function goDedupPage(page) {
   dedupPage = page;
   renderDedupList();
-}
-
-function toggleDedupCheckAll(checked) {
-  document.querySelectorAll('.dedup-check').forEach(cb => cb.checked = checked);
 }
 
 function updateDedupDeleteCol(realIdx) {
